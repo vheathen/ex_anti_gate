@@ -10,7 +10,14 @@ defmodule ExAntiGate.Mixfile do
      deps: deps(),
 
      name: "ExAntiGate",
-     descirption: "Elixir AntiGate.com API implementation"]
+     source_url: "https://github.com/vheathen/ex_anti_gate",
+     descirption: "Elixir AntiGate.com API implementation",
+     package: [
+             maintainers: ["Vladimir Drobyshevskiy"],
+             licenses: ["MIT"],
+             links: %{ "GitHub" => "https://github.com/vheathen/ex_anti_gate" },
+           ]
+     ]
   end
 
   # Configuration for the OTP application
@@ -31,6 +38,8 @@ defmodule ExAntiGate.Mixfile do
   #
   # Type "mix help deps" for more examples and options
   defp deps do
-    []
+    [
+      {}
+    ]
   end
 end
