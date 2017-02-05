@@ -3,7 +3,7 @@ defmodule ExAntiGate.Mixfile do
 
   def project do
     [app: :ex_anti_gate,
-     version: "0.1.0",
+     version: "0.1.1",
      elixir: "~> 1.4",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
@@ -11,8 +11,10 @@ defmodule ExAntiGate.Mixfile do
 
      name: "ExAntiGate",
      source_url: "https://github.com/vheathen/ex_anti_gate",
-     descirption: "Elixir AntiGate.com API implementation",
+     descirption: "Elixir AntiGate.com (anti-captcha.com) captcha solving service API client",
      package: [
+             name: :ex_anti_gate,
+             files: ["lib", "config/config.exs", "mix.exs", "README*", "readme*", "LICENSE*", "license*"],
              maintainers: ["Vladimir Drobyshevskiy"],
              licenses: ["MIT"],
              links: %{ "GitHub" => "https://github.com/vheathen/ex_anti_gate" },
