@@ -1,22 +1,23 @@
 defmodule ExAntiGateTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: false
 
   import Mock
   require Logger
 
   @config_defaults %{
-    autostart: true, # spawn and supervise antigate process by default
+    autostart: true, # Start ExAntiGate process on application start
+
+    # ############################# task options #####################################
 
     api_host: "https://api.anti-captcha.com",
     language_pool: "en",             # "en" (default) - english queue,
                                      # "rn" - Russian, Ukrainian, Belorussian, Kazakh language group
-    result_request_interval: 10, # result request first attemt interval, in milliseconds
-    result_retry_inteval: 5,     # delay between captcha status checks, in milliseconds
-    retry_on_error_interval: 5,  # delay between retries to catch free slot to proceed captcha, in milliseconds
-    max_retries_on_error: 0,         # number of retries to catch a free slot,
+    result_request_interval: 10_000, # result request first attemt interval, in milliseconds
+    result_retry_inteval: 2_000,     # delay between captcha status checks, in milliseconds
+    no_slot_retry_interval: 5_000,   # delay between retries to catch a free slot to proceed captcha, in milliseconds
+    no_slot_max_retries: 0,          # number of retries to catch a free slot,
                                      # 0 - until (max_timeout - result_request_inteval) milliseconds gone
-    max_timeout: 120,            # captcha recognition\retries maximum timeout
-
+    max_timeout: 120_000,            # captcha recognition\retries maximum timeout
     phrase: false,                   # does captcha have one or more spaces
     case: false,                     # captcha is case sensetive
     numeric: 0,                      # 0 - any symbols
@@ -27,7 +28,7 @@ defmodule ExAntiGateTest do
                                      # > 0 - an integer sets minimum captcha length
     max_length: 0, # 0 - has no limits
                    # > 0 - an integer sets maximum captcha length
-    push: false,   # do not reply to the sender by default (wait for a result request)
+    push: false    # do not reply to the sender by default (wait for a result request)
   }
 
   @runtime_defaults %{
@@ -43,8 +44,8 @@ defmodule ExAntiGateTest do
 
   @reduced_timeouts %{
     result_request_interval: 10,
-    result_retry_inteval: 5,
-    retry_on_error_interval: 5,
+    result_retry_inteval: 2,
+    no_slot_retry_interval: 5,
     max_timeout: 120,
   }
 
