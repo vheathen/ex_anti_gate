@@ -130,11 +130,13 @@ defmodule ExAntiGate do
 
     task = Map.merge(options, %{from: from, image: image, type: "ImageToTextTask", timer: timer})
 
-#    unless Map.get(task, :fake), do:
-#      spawn fn -> create_antigate_task(task_uuid, task.api_host, gen_task_request(task)) end
-
-    unless Map.get(task, :fake), do:
-      create_antigate_task(task_uuid, task.api_host, gen_task_request(task))
+    unless Map.get(task, :fake) do
+      if Mix.env == :test do
+        create_antigate_task(task_uuid, task.api_host, gen_task_request(task))
+      else
+        spawn fn -> create_antigate_task(task_uuid, task.api_host, gen_task_request(task)) end
+      end
+    end
 
 #    GenServer.cast(__MODULE__, {:proceed_text_task, task_uuid})
 
