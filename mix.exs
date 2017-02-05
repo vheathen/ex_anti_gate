@@ -4,7 +4,7 @@ defmodule ExAntiGate.Mixfile do
   def project do
     [app: :ex_anti_gate,
      version: "0.1.0",
-     elixir: "~> 1.3",
+     elixir: "~> 1.4",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
      deps: deps(),
@@ -25,7 +25,8 @@ defmodule ExAntiGate.Mixfile do
   # Type "mix help compile.app" for more information
   def application do
     # Specify extra applications you'll use from Erlang/Elixir
-    [applications: [:logger, :httpoison]]
+    [ mod: {ExAntiGate.App, []},
+      extra_applications: [:logger]]
   end
 
   # Dependencies can be Hex packages:
@@ -41,7 +42,9 @@ defmodule ExAntiGate.Mixfile do
     [
       {:httpoison, "~> 0.11.0"},
       {:dogma, "~> 0.0", only: [:test]},
-      {:mix_test_watch, "~> 0.0", only: [:dev]},
+      {:mix_test_watch, "~> 0.0", runtime: false, only: [:dev]},
+      {:mock, "~> 0.2.0", only: [:test]},
+      {:ecto, "~> 2.1", runtime: false}
     ]
   end
 end
