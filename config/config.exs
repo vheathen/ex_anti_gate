@@ -35,7 +35,8 @@ config :ex_anti_gate,
     no_slot_retry_interval: 5_000,   # delay between retries to catch a free slot to proceed captcha, in milliseconds
     no_slot_max_retries: 0,          # number of retries to catch a free slot,
                                      # 0 - until (max_timeout - result_request_inteval) milliseconds gone
-    max_timeout: 120_000,            # captcha recognition\retries maximum timeout
+    max_timeout: 120_000,            # captcha recognition maximum timeout;
+                                     # the result value must be read during this period
     phrase: false,                   # does captcha have one or more spaces
     case: false,                     # captcha is case sensetive
     numeric: 0,                      # 0 - any symbols

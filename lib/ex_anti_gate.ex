@@ -30,7 +30,8 @@ defmodule ExAntiGate do
           no_slot_retry_interval: 5_000,   # delay between retries to catch a free slot to proceed captcha, in milliseconds
           no_slot_max_retries: 0,          # number of retries to catch a free slot,
                                            # 0 - until (max_timeout - result_request_inteval) milliseconds gone
-          max_timeout: 120_000,            # captcha recognition maximum timeout
+          max_timeout: 120_000,            # captcha recognition maximum timeout;
+                                           # the result value must be read during this period
           phrase: false,                   # does captcha have one or more spaces
           case: false,                     # captcha is case sensetive
           numeric: 0,                      # 0 - any symbols
@@ -46,15 +47,17 @@ defmodule ExAntiGate do
 
   @task_defaults %{
                     from: nil,
-                    created_at: nil,
-                    updated_at: nil,
+                    timer: nil,
                     type: nil,
                     image: nil,
+                    no_slot_attempts: 0,
                     status: :waiting,
-                    result: :none
+                    result: :none,
+                    api_task_id: nil
                   }
 
   use GenServer
+  require Logger
   import Ecto.UUID, only: [generate: 0]
 
   # #########################################################
@@ -104,8 +107,8 @@ defmodule ExAntiGate do
   end
 
   @doc false
-  def set_result(task_uuid, result) do
-    GenServer.cast(__MODULE__, {:set_result, task_uuid, result})
+  def proceed_result(task_uuid, result) do
+    GenServer.cast(__MODULE__, {:proceed_result, task_uuid, result})
   end
 
   # #########################################################
@@ -117,49 +120,105 @@ defmodule ExAntiGate do
     {:reply, Map.get(state, task_uuid), state}
   end
 
-  # generate task uuid, put image data into state, send solving to itself
+  # generate task uuid, put image data into state, send request to antigate
   # and return task uuid
   @doc false
   def handle_call({:solve_text, image, options}, from, state) do
     task_uuid = generate()
+    options = merge_options(options)
+    timer = Process.send_after(self(), {:cancel_task, task_uuid}, options.max_timeout)
 
-    task = options
-           |> merge_options()
-           |> Map.merge(%{from: from, image: image, type: "ImageToTextTask"})
+    task = Map.merge(options, %{from: from, image: image, type: "ImageToTextTask", timer: timer})
 
-    GenServer.cast(__MODULE__, {:proceed_text_task, task_uuid})
+#    unless Map.get(task, :fake), do:
+#      spawn fn -> create_antigate_task(task_uuid, task.api_host, gen_task_request(task)) end
+
+    unless Map.get(task, :fake), do:
+      create_antigate_task(task_uuid, task.api_host, gen_task_request(task))
+
+#    GenServer.cast(__MODULE__, {:proceed_text_task, task_uuid})
 
     {:reply, task_uuid, Map.merge(state, %{task_uuid => task})}
   end
 
   # Get image from state, send request to antigate and
   @doc false
-  def handle_cast({:proceed_text_task, task_uuid}, state) do
+  def handle_cast({:proceed_text_task, _task_uuid}, state) do
 
-    task = state[task_uuid]
+#    task = state[task_uuid]
 
-    :timer.sleep(task.max_timeout)
+#    :timer.sleep(task.max_timeout)
     # TODO: actual image solving
 
+#    state =
+#      if state[task_uuid].push do
+#        {from_pid, _} = task.from
+#        GenServer.cast(from_pid, {:antigate_result, task_uuid})
+#        state |> Map.delete(task_uuid)
+#      else
+#        state
+#      end
+
+    {:noreply, state}
+  end
+
+  def handle_cast({:proceed_result, task_uuid, {:api_task_id, result}}, state) do
     state =
-      if state[task_uuid].push do
-        {from_pid, _} = task.from
-        GenServer.cast(from_pid, {:antigate_result, task_uuid})
-        state |> Map.delete(task_uuid)
+      with task when not is_nil(task) <- Map.get(state, task_uuid),
+           {:ok, %HTTPoison.Response{ body: body, status_code: 200 }} <- result,
+           {:ok, %{"errorId" => 0, "taskId" => task_id}} <- Poison.decode(body)
+      do
+        put_in(state, [task_uuid, :api_task_id], task_id)
       else
-        state
+        res ->
+          Logger.error "Error: #{inspect res}"
+          state
+      end
+
+#    case Map.get(state, task_uuid) do
+#      nil -> false
+#      task ->
+#        if task.push do
+#          {from_pid, _} = task.from
+#          Process.send(from_pid, {:ex_anti_gate_result, {:error, task_uuid, :timeout}}, [])
+#        end
+#        Map.delete(state, task_uuid)
+#    end
+#
+
+    {:noreply, state}
+  end
+
+  # handle max timeout
+  @doc false
+  def handle_info({:cancel_task, task_uuid}, state) do
+    state =
+      case Map.get(state, task_uuid) do
+        nil -> state
+        task ->
+          if task.push do
+            {from_pid, _} = task.from
+            Process.send(from_pid, {:ex_anti_gate_result, {:error, task_uuid, :timeout}}, [])
+          end
+          Map.delete(state, task_uuid)
       end
 
     {:noreply, state}
   end
 
-  defp gen_task_request(full_task) do
+  @doc false
+  def gen_task_request(full_task) do
     %{
         clientKey: full_task.api_key,
         softId: "",
         languagePool: full_task.language_pool,
         task: gen_text_task(full_task)
     }
+  end
+
+  defp create_antigate_task(task_uuid, api_host, request) do
+    result = HTTPoison.post("#{api_host}/createTask", Poison.encode!(request), [{"Content-Type", "application/json"}])
+    ExAntiGate.proceed_result(task_uuid, {:api_task_id, result})
   end
 
   defp gen_text_task(full_task) do
@@ -170,26 +229,18 @@ defmodule ExAntiGate do
        case: full_task.case,
        numeric: full_task.numeric,
        math: full_task.math,
-       minLength: full_task.minLength,
-       maxLength: full_task.maxLength,
+       minLength: full_task.min_length,
+       maxLength: full_task.max_length,
     }
   end
 
   defp merge_options(options) do
-    now = now()
-
     :ex_anti_gate
     |> Application.get_all_env()
     |> Enum.concat(options)
     |> Enum.into(%{})
     |> Map.delete(:included_applications)
     |> Map.merge(@task_defaults)
-    |> Map.put(:created_at, now)
-    |> Map.put(:updated_at, now)
   end
 
-  defp now(timeunit \\ :millisecond) do
-    DateTime.utc_now()
-    |> DateTime.to_unix(timeunit)
-  end
 end
