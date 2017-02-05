@@ -23,6 +23,9 @@ use Mix.Config
 
 config :ex_anti_gate,
     autostart: true, # Start ExAntiGate process on application start
+
+    # ############################# task options #####################################
+
     api_key: nil,
     api_host: "https://api.anti-captcha.com",
     language_pool: "en",             # "en" (default) - english queue,

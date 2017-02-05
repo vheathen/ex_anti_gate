@@ -1,10 +1,12 @@
 # ExAntiGate
 
-## Disclamer
-This project has been intended for fair use only. It's not allowed to use it for any destructive, anti-social and\or illegal activity. 
+## Disclimer
+This project has been intended for fair use only. It's not allowed to use it for any destructive, 
+anti-social and/or illegal activity.
 
 ## Description
-Elixir API client for [anti-captcha.com](http://anti-captcha.com) ([antigate.com](http://antigate.com)). The service helps to solve captchas.   
+Unofficial client for [anti-captcha.com](http://anti-captcha.com) ([antigate.com](http://antigate.com)) API.
+The antigate service solves captchas by human workers.
 
 ## Installation
 
