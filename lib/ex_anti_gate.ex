@@ -4,7 +4,7 @@ defmodule ExAntiGate do
   ([antigate.com](http://antigate.com)) API client for Elixir. The antigate service solves captchas
   by human workers.
 
-  ## Disclimer
+  ## Disclaimer
   This project has been intended for fair use only. It's not allowed to use it for any destructive,
   anti-social and/or illegal activity.
 

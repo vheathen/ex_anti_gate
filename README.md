@@ -1,6 +1,6 @@
 # ExAntiGate
 
-## Disclimer
+## Disclaimer
 This project has been intended for fair use only. It's not allowed to use it for any destructive, 
 anti-social and/or illegal activity.
 
