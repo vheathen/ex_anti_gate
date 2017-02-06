@@ -147,7 +147,7 @@ defmodule ExAntiGateTest do
   end
 
   test "captcha must be solved in the end" do
-    defmodule HTTPoisonTest2 do
+    defmodule HTTPoisonTest do
       def post("https://api.anti-captcha.com/createTask", _request, _headers) do
         :timer.sleep 10
         { :ok,
@@ -166,16 +166,47 @@ defmodule ExAntiGateTest do
       end
     end
 
-    task_uuid = ExAntiGate.solve_text_task("somestring", http_client: HTTPoisonTest2)
+    task_uuid = ExAntiGate.solve_text_task("somestring", http_client: HTTPoisonTest)
 
     :timer.sleep 70
 
     task = ExAntiGate.get_task(task_uuid)
 
     assert task.status == :ready
-    refute task.result == %{text: "deditour"}
+    assert task.result == %{text: "deditur"}
 
 #    assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, -3, "ERROR_NO_SLOT_MAX_RETRIES", "Maximum attempts to catch free slot reached, task interrupted."}}, defaults_reduced().max_timeout + 20
+
+  end
+
+  test "captcha must be solved in the end and get_task_result must work" do
+    defmodule HTTPoisonTest do
+      def post("https://api.anti-captcha.com/createTask", _request, _headers) do
+        :timer.sleep 10
+        { :ok,
+          %HTTPoison.Response{  body: ~S({"errorId":0,"taskId":1234567}),
+                                headers: ExAntiGateTest.httpoison_headers(),
+                                status_code: 200}
+        }
+      end
+      def post("https://api.anti-captcha.com/getTaskResult", _request, _headers) do
+        :timer.sleep 10
+        { :ok,
+          %HTTPoison.Response{  body: ~S({"errorId":0,"status":"ready","solution":{"text":"deditur","url":"http://61.39.233.233/1/147220556452507.jpg"},"cost":"0.000700","ip":"46.98.54.221","createTime":1472205564,"endTime":1472205570,"solveCount":"0"}),
+                                headers: ExAntiGateTest.httpoison_headers(),
+                                status_code: 200}
+        }
+      end
+    end
+
+    task_uuid = ExAntiGate.solve_text_task("somestring", http_client: HTTPoisonTest)
+
+    :timer.sleep 70
+
+    {status, result} = ExAntiGate.get_task_result(task_uuid)
+
+    assert status == :ready
+    assert result == %{text: "deditur"}
 
   end
 

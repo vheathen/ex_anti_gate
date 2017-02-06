@@ -25,15 +25,19 @@ defmodule ExAntiGateRealTest do
                    Application.get_env(:ex_anti_gate, :max_timeout) + 100
   end
 
-  test "image 1 with push" do
+  test "image 1 with get_task_result" do
 
     image = ImageList.get_image(1).image
     code = ImageList.get_image(1).code
 
-    task_uuid = ExAntiGate.solve_text_task(image, push: true)
+    task_uuid = ExAntiGate.solve_text_task(image)
 
-    assert_receive {:ex_anti_gate_result, {:ready, ^task_uuid, %{text: ^code}}},
-                   Application.get_env(:ex_anti_gate, :max_timeout) + 100
+    :timer.sleep 25_000
+
+    {status, result} = ExAntiGate.get_task_result(task_uuid)
+
+    assert status == :ready
+    assert result.text == code
   end
 
   test "image 2 without push" do
