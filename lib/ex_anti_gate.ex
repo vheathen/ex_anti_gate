@@ -133,7 +133,7 @@ defmodule ExAntiGate do
     unless Map.get(task, :fake), do:
         spawn fn ->
           result = task.http_client.post("#{task.api_host}/createTask", Poison.encode!(gen_task_request(task)), [{"Content-Type", "application/json"}])
-          ExAntiGate.proceed_result(task_uuid, {:api_task_id, result})
+          ExAntiGate.proceed_result(task_uuid, result)
         end
 
 #    GenServer.cast(__MODULE__, {:proceed_text_task, task_uuid})
@@ -162,19 +162,9 @@ defmodule ExAntiGate do
     {:noreply, state}
   end
 
-  def handle_cast({:proceed_result, task_uuid, {:api_task_id, result}}, state) do
-    state =
-      with task when not is_nil(task) <- Map.get(state, task_uuid),
-           {:ok, %HTTPoison.Response{ body: body, status_code: 200 }} <- result,
-           {:ok, json_body} <- Poison.decode(body),
-           %{"errorId" => 0, "taskId" => task_id} <- json_body
-      do
-        put_in(state, [task_uuid, :api_task_id], task_id)
-
-      else
-        error ->
-          parse_error(task_uuid, error, state)
-      end
+  @doc false
+  def handle_cast({:proceed_result, task_uuid, result}, state) do
+    state = proceed_response(task_uuid, result, state)
 
     {:noreply, state}
   end
@@ -191,6 +181,40 @@ defmodule ExAntiGate do
     {:noreply, state}
   end
 
+  # ################################################### #
+  #            proceed API request results              #
+  # ################################################### #
+
+  # check for task
+  defp proceed_response(task_uuid, response, state) do
+    # could be rewriten inline, but this is for better code readability
+    task = Map.get(state, task_uuid)
+    proceed_response(task, task_uuid, response, state)
+  end
+
+  # no task with such uuid - do nothing
+  defp proceed_response(task, _task_uuid, _response, state) when is_nil(task) do
+    state
+  end
+  # Got a normal HTTP response
+  defp proceed_response(task, task_uuid, {:ok, %HTTPoison.Response{body: body, status_code: 200}} = _response, state) do
+    json_decode_result = Poison.decode(body)
+    proceed_response(task, task_uuid, json_decode_result, state)
+  end
+  # API task ID
+  defp proceed_response(_task, task_uuid, {:ok, %{"errorId" => 0, "taskId" => api_task_id} = _json_body}, state) do
+    put_in(state, [task_uuid, :api_task_id], api_task_id)
+  end
+
+  # Any other - probably an error
+  defp proceed_response(_task, task_uuid, error, state) do
+    parse_error(task_uuid, error, state)
+  end
+
+  # ################################################### #
+  #                  proceed errors                     #
+  # ################################################### #
+
   # try to get task
   defp parse_error(task_uuid, error, state) when is_binary task_uuid do
     task = Map.get(state, task_uuid)
@@ -206,6 +230,9 @@ defmodule ExAntiGate do
     proceed_error(task, task_uuid, {error_id, error_code, nil}, state)
   end
   # If error is API or timeout error
+  defp parse_error(task, task_uuid, {:ok, %{"errorCode" => error_code, "errorDescription" => error_descr, "errorId" => error_id}}, state) do
+    proceed_error(task, task_uuid, {error_id, error_code, error_descr}, state)
+  end
   defp parse_error(task, task_uuid, %{"errorCode" => error_code, "errorDescription" => error_descr, "errorId" => error_id}, state) do
     proceed_error(task, task_uuid, {error_id, error_code, error_descr}, state)
   end
@@ -231,16 +258,18 @@ defmodule ExAntiGate do
     |> put_in([task_uuid, :status], :error)
   end
 
+  # Generate task request
   defp gen_task_request(full_task) do
     %{
         clientKey: full_task.api_key,
         softId: "",
         languagePool: full_task.language_pool,
-        task: gen_text_task(full_task)
+        task: gen_task(full_task)
     }
   end
 
-  defp gen_text_task(full_task) do
+  # Generate task object
+  defp gen_task(%{type: "ImageToTextTask"} = full_task) do
     %{
        type: full_task.type,
        body: full_task.image,
@@ -251,6 +280,9 @@ defmodule ExAntiGate do
        minLength: full_task.min_length,
        maxLength: full_task.max_length,
     }
+  end
+  defp gen_task(%{type: "ImageToTextTask"} = full_task) do
+    %{}
   end
 
   defp merge_options(options) do

@@ -145,15 +145,27 @@ defmodule ExAntiGateTest do
     assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, 22, "ERROR_TASK_ABSENT", "Task property is empty or not set. Please refer to API v2 documentation."}}, @defaults_reduced.max_timeout + 10
   end
 
-#  test "try to receive a reply" do
-#    task_uuid = ExAntiGate.solve_text_task("", push: true)
-#    assert_receive {:"$gen_cast", {:antigate_result, ^task_uuid}}, Application.get_env(:ex_anti_gate, :max_timeout) + 10
-#  end
-#
-#  test "must have not a reply with default settings" do
-#    uuid = ExAntiGate.solve_text_task("")
-#    refute_receive {:"$gen_cast", {:antigate_result, ^uuid}}, Application.get_env(:ex_anti_gate, :max_timeout) + 10
-#  end
+  test "must retry if there is no free slot available" do
+    defmodule HTTPoisonTest do
+      def post(_url, _request, _headers) do
+        { :ok,
+          %HTTPoison.Response{  body: ~S({"errorId":2,"errorCode":"ERROR_NO_SLOT_AVAILABLE","errorDescription":"Doesn't matter"}),
+                                headers: ExAntiGateTest.httpoison_headers(),
+                                status_code: 200}
+        }
+      end
+    end
+
+    task_uuid = ExAntiGate.solve_text_task("somestring", http_client: HTTPoisonTest)
+
+    task = ExAntiGate.get_task(task_uuid)
+
+    :timer.sleep 50
+
+    assert task.api_task_id == nil
+    refute task.no_slot_attempts == 0
+
+  end
 
   defp nilify_task_fields(task) do
     task
