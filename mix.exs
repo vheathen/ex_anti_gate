@@ -48,7 +48,6 @@ defmodule ExAntiGate.Mixfile do
       {:ex_doc, "~> 0.14", only: :dev},
       {:dogma, "~> 0.0", only: [:test]},
       {:mix_test_watch, "~> 0.0", runtime: false, only: [:dev]},
-      {:mock, "~> 0.2.0", only: [:test]},
     ]
   end
 end

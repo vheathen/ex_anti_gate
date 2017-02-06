@@ -1,7 +1,6 @@
 defmodule ExAntiGateTest do
   use ExUnit.Case, async: false
 
-  import Mock
   require Logger
 
   alias ExAntiGateTest.ImageList
@@ -60,7 +59,7 @@ defmodule ExAntiGateTest do
 
   doctest ExAntiGate
 
-  setup_all do
+  setup do
     Enum.each(@config_defaults_reduced, fn({k, v}) ->
       Application.put_env(:ex_anti_gate, k, v)
     end)
