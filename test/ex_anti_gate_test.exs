@@ -3,64 +3,12 @@ defmodule ExAntiGateTest do
 
   require Logger
 
-  alias ExAntiGateTest.ImageList
-
-  @config_defaults %{
-    autostart: true, # Start ExAntiGate process on application start
-
-    # ############################# task options #####################################
-
-    api_host: "https://api.anti-captcha.com",
-    language_pool: "en",             # "en" (default) - english queue,
-                                     # "rn" - Russian, Ukrainian, Belorussian, Kazakh language group
-    result_request_interval: 10_000, # result request first attemt interval, in milliseconds
-    result_retry_interval: 2_000,     # delay between captcha status checks, in milliseconds
-    no_slot_retry_interval: 5_000,   # delay between retries to catch a free slot to proceed captcha, in milliseconds
-    no_slot_max_retries: 0,          # number of retries to catch a free slot,
-                                     # 0 - until (max_timeout - result_request_inteval) milliseconds gone
-    max_timeout: 120_000,            # captcha recognition\retries maximum timeout
-    phrase: false,                   # does captcha have one or more spaces
-    case: false,                     # captcha is case sensetive
-    numeric: 0,                      # 0 - any symbols
-                                     # 1 - captcha has digits only
-                                     # 2 - captcha has any symbols EXCEPT digits
-    math: false,                     # captcha is a math equation and it's necessary to solve it and enter result
-    min_length: 0,                   # 0 - has no limits
-                                     # > 0 - an integer sets minimum captcha length
-    max_length: 0, # 0 - has no limits
-                   # > 0 - an integer sets maximum captcha length
-    push: false    # do not reply to the sender by default (wait for a result request)
-  }
-
-  @runtime_defaults %{
-    # from task_default
-    from: nil,
-    timer: nil,
-    type: nil,
-    image: nil,
-    no_slot_attempts: 0,
-    status: :waiting,
-    result: :none,
-    api_task_id: nil
-  }
-
-  @reduced_timeouts %{
-    result_request_interval: 10,
-    result_retry_interval: 2,
-    no_slot_retry_interval: 5,
-    max_timeout: 120,
-  }
-
-  @config_defaults_reduced Map.merge(@config_defaults, @reduced_timeouts)
-
-  @defaults Map.merge(@config_defaults, @runtime_defaults)
-
-  @defaults_reduced Map.merge(@defaults, @reduced_timeouts)
+  import ExAntiGateTest.Config
 
   doctest ExAntiGate
 
   setup do
-    Enum.each(@config_defaults_reduced, fn({k, v}) ->
+    Enum.each(config_defaults_reduced(), fn({k, v}) ->
       Application.put_env(:ex_anti_gate, k, v)
     end)
 
@@ -76,14 +24,14 @@ defmodule ExAntiGateTest do
     task_uuid = ExAntiGate.solve_text_task("somestring", fake: true)
     task = ExAntiGate.get_task(task_uuid)
 
-    assert nilify_task_fields(task) == Map.merge(@defaults_reduced, %{image: "somestring", timer: nil})
+    assert nilify_task_fields(task) == Map.merge(defaults_reduced(), %{image: "somestring", timer: nil})
   end
 
   test "options changes must be set" do
     task_uuid = ExAntiGate.solve_text_task("somestring", phrase: true, fake: true)
     task = ExAntiGate.get_task(task_uuid)
 
-    assert nilify_task_fields(task) == Map.merge(@defaults_reduced, %{image: "somestring", phrase: true})
+    assert nilify_task_fields(task) == Map.merge(defaults_reduced(), %{image: "somestring", phrase: true})
   end
 
   test "type must be 'ImageToTextTask' in case of text captcha solving" do
@@ -100,7 +48,7 @@ defmodule ExAntiGateTest do
 
   test "task must not be available after max timeout" do
     task_uuid = ExAntiGate.solve_text_task("somestring", fake: true)
-    :timer.sleep @defaults_reduced.max_timeout + 10
+    :timer.sleep defaults_reduced().max_timeout + 10
     task = ExAntiGate.get_task(task_uuid)
 
     assert is_nil(task)
@@ -108,10 +56,11 @@ defmodule ExAntiGateTest do
 
   test "must receive an error after max timeout in case of push: true" do
     task_uuid = ExAntiGate.solve_text_task("", push: true, fake: true)
-    assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, -2, "ERROR_API_TIMEOUT", "Maximum timeout reached, task interrupted."}}, @defaults_reduced.max_timeout + 50
+    assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, -2, "ERROR_API_TIMEOUT", "Maximum timeout reached, task interrupted."}}, defaults_reduced().max_timeout + 50
     assert is_nil ExAntiGate.get_task(task_uuid)
   end
 
+  # 'noun' mocking: http://blog.plataformatec.com.br/2015/10/mocks-and-explicit-contracts/
   test "task id must be set after initial API call" do
     defmodule HTTPoisonTest do
       def post("https://api.anti-captcha.com/createTask", _request, _headers) do
@@ -134,7 +83,7 @@ defmodule ExAntiGateTest do
 
     task_uuid = ExAntiGate.solve_text_task("somestring", http_client: HTTPoisonTest)
 
-    :timer.sleep 50
+    :timer.sleep 100
 
     assert ExAntiGate.get_task(task_uuid)[:api_task_id] == 1234567
   end
@@ -161,7 +110,7 @@ defmodule ExAntiGateTest do
 
     task_uuid = ExAntiGate.solve_text_task("somestring", http_client: HTTPoisonTest, push: true)
 
-    assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, 22, "ERROR_TASK_ABSENT", "Task property is empty or not set. Please refer to API v2 documentation."}}, @defaults_reduced.max_timeout + 10
+    assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, 22, "ERROR_TASK_ABSENT", "Task property is empty or not set. Please refer to API v2 documentation."}}, defaults_reduced().max_timeout + 10
   end
 
   test "must retry if there is no free slot available" do
@@ -193,7 +142,7 @@ defmodule ExAntiGateTest do
     assert task.api_task_id == nil
     refute task.no_slot_attempts == 0
 
-    assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, -3, "ERROR_NO_SLOT_MAX_RETRIES", "Maximum attempts to catch free slot reached, task interrupted."}}, @defaults_reduced.max_timeout + 20
+    assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, -3, "ERROR_NO_SLOT_MAX_RETRIES", "Maximum attempts to catch free slot reached, task interrupted."}}, defaults_reduced().max_timeout + 20
 
   end
 
@@ -226,7 +175,7 @@ defmodule ExAntiGateTest do
     assert task.status == :ready
     refute task.result == %{text: "deditour"}
 
-#    assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, -3, "ERROR_NO_SLOT_MAX_RETRIES", "Maximum attempts to catch free slot reached, task interrupted."}}, @defaults_reduced.max_timeout + 20
+#    assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, -3, "ERROR_NO_SLOT_MAX_RETRIES", "Maximum attempts to catch free slot reached, task interrupted."}}, defaults_reduced().max_timeout + 20
 
   end
 

@@ -5,6 +5,7 @@ defmodule ExAntiGate.Mixfile do
     [app: :ex_anti_gate,
      version: "0.1.1",
      elixir: "~> 1.4",
+     elixirc_paths: elixirc_paths(Mix.env),
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
      deps: deps(),
@@ -21,6 +22,10 @@ defmodule ExAntiGate.Mixfile do
            ]
      ]
   end
+
+  # Specifies which paths to compile per environment.
+  defp elixirc_paths(:test), do: ["lib", "test"]
+  defp elixirc_paths(_),     do: ["lib"]
 
   # Configuration for the OTP application
   #

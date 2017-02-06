@@ -154,8 +154,10 @@ defmodule ExAntiGate do
       task ->
         unless Map.get(task, :fake), do:
           spawn fn ->
-            Logger.debug "ExAntiGate: api_create_task call, sending request, uuid: #{task_uuid}"
-            response = task.http_client.post("#{task.api_host}/createTask", Poison.encode!(gen_task_request(task)), [{"Content-Type", "application/json"}])
+            task_request = Poison.encode!(gen_task_request(task))
+
+            Logger.debug "ExAntiGate: api_create_task call, sending request, uuid: #{task_uuid}, request: #{task_request}"
+            response = task.http_client.post("#{task.api_host}/createTask", task_request, [{"Content-Type", "application/json"}])
             Logger.debug "ExAntiGate: api_create_task call, got response, uuid: #{task_uuid}, response: #{inspect response}"
             ExAntiGate.proceed_result(response, task_uuid)
           end
@@ -246,7 +248,7 @@ defmodule ExAntiGate do
     state
     |> put_in([task_uuid, :result], %{text: text})
     |> put_in([task_uuid, :status], :ready)
-    |> push_data(task, task_uuid, {:ready, task_uuid, get_in(state, [task_uuid, :result])})
+    |> push_data(task, task_uuid, {:ready, task_uuid, %{text: text}})
   end
 
   # Any other - probably an error
