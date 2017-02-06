@@ -1,14 +1,12 @@
 defmodule ExAntiGate do
   @moduledoc """
-  This is documentation for ExAntiGate - unofficial client for Antigate.com API in Elixir.
+  This is documentation for ExAntiGate - unofficial [anti-captcha.com](http://anti-captcha.com)
+  ([antigate.com](http://antigate.com)) API client for Elixir. The antigate service solves captchas
+  by human workers.
 
   ## Disclimer
   This project has been intended for fair use only. It's not allowed to use it for any destructive,
   anti-social and/or illegal activity.
-
-  ## Description
-  Unofficial Elixir client for [anti-captcha.com](http://anti-captcha.com) ([antigate.com](http://antigate.com)) API.
-  The antigate service solves captchas by human workers.
 
   ## Configuration
   The Antigate client has to be configured. At least `api_key` MUST be set, otherwise the client
@@ -133,7 +131,7 @@ defmodule ExAntiGate do
   end
 
   @doc """
-  Returns a task full current state by uuid
+  Returns task's current full structure by uuid
   """
   def get_task(task_uuid) do
     GenServer.call(__MODULE__, {:get_task, task_uuid})
@@ -374,7 +372,7 @@ defmodule ExAntiGate do
   defp gen_task_request(full_task) do
     %{
         clientKey: full_task.api_key,
-        softId: "",
+        softId: "829",
         languagePool: full_task.language_pool,
         task: gen_task(full_task)
     }
