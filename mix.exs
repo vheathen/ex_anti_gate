@@ -12,10 +12,10 @@ defmodule ExAntiGate.Mixfile do
 
      name: "ExAntiGate",
      source_url: "https://github.com/vheathen/ex_anti_gate",
-     descirption: "Elixir AntiGate.com (anti-captcha.com) captcha solving service API client",
+     description: "Elixir AntiGate.com (anti-captcha.com) captcha solving service API client",
      package: [
              name: :ex_anti_gate,
-             files: ["lib", "config/config.exs", "mix.exs", "README*", "readme*", "LICENSE*", "license*"],
+             files: ["lib", "config/config.exs", "mix.exs", "README*", "LICENSE*"],
              maintainers: ["Vladimir Drobyshevskiy"],
              licenses: ["MIT"],
              links: %{ "GitHub" => "https://github.com/vheathen/ex_anti_gate" },
