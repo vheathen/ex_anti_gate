@@ -51,7 +51,7 @@ defmodule ExAntiGate do
                     type: nil,
                     image: nil,
                     no_slot_attempts: 0,
-                    status: :waiting,
+                    status: :waiting, # or :ok, or :error
                     result: :none,
                     api_task_id: nil
                   }
@@ -130,13 +130,11 @@ defmodule ExAntiGate do
 
     task = Map.merge(options, %{from: from, image: image, type: "ImageToTextTask", timer: timer})
 
-    unless Map.get(task, :fake) do
-      if Mix.env == :test do
-        create_antigate_task(task_uuid, task.api_host, gen_task_request(task))
-      else
-        spawn fn -> create_antigate_task(task_uuid, task.api_host, gen_task_request(task)) end
-      end
-    end
+    unless Map.get(task, :fake), do:
+        spawn fn ->
+          result = task.http_client.post("#{task.api_host}/createTask", Poison.encode!(gen_task_request(task)), [{"Content-Type", "application/json"}])
+          ExAntiGate.proceed_result(task_uuid, {:api_task_id, result})
+        end
 
 #    GenServer.cast(__MODULE__, {:proceed_text_task, task_uuid})
 
@@ -168,25 +166,15 @@ defmodule ExAntiGate do
     state =
       with task when not is_nil(task) <- Map.get(state, task_uuid),
            {:ok, %HTTPoison.Response{ body: body, status_code: 200 }} <- result,
-           {:ok, %{"errorId" => 0, "taskId" => task_id}} <- Poison.decode(body)
+           {:ok, json_body} <- Poison.decode(body),
+           %{"errorId" => 0, "taskId" => task_id} <- json_body
       do
         put_in(state, [task_uuid, :api_task_id], task_id)
-      else
-        res ->
-          Logger.error "Error: #{inspect res}"
-          state
-      end
 
-#    case Map.get(state, task_uuid) do
-#      nil -> false
-#      task ->
-#        if task.push do
-#          {from_pid, _} = task.from
-#          Process.send(from_pid, {:ex_anti_gate_result, {:error, task_uuid, :timeout}}, [])
-#        end
-#        Map.delete(state, task_uuid)
-#    end
-#
+      else
+        error ->
+          parse_error(task_uuid, error, state)
+      end
 
     {:noreply, state}
   end
@@ -194,33 +182,62 @@ defmodule ExAntiGate do
   # handle max timeout
   @doc false
   def handle_info({:cancel_task, task_uuid}, state) do
+
     state =
-      case Map.get(state, task_uuid) do
-        nil -> state
-        task ->
-          if task.push do
-            {from_pid, _} = task.from
-            Process.send(from_pid, {:ex_anti_gate_result, {:error, task_uuid, :timeout}}, [])
-          end
-          Map.delete(state, task_uuid)
-      end
+      task_uuid
+      |> parse_error(%{"errorId" => -2, "errorCode" => "ERROR_API_TIMEOUT", "errorDescription" => "Maximum timeout reached, task interrupted"}, state)
+      |> Map.delete(task_uuid)
 
     {:noreply, state}
   end
 
-  @doc false
-  def gen_task_request(full_task) do
+  # try to get task
+  defp parse_error(task_uuid, error, state) when is_binary task_uuid do
+    task = Map.get(state, task_uuid)
+    parse_error(task, task_uuid, error, state)
+  end
+
+  # if task is nil just return state
+  defp parse_error(task, _task_uuid, _error, state) when is_nil task do
+    state
+  end
+  # if error is HTTPoison client error
+  defp parse_error(task, task_uuid, {:error, %HTTPoison.Error{id: error_id, reason: error_code}}, state) do
+    proceed_error(task, task_uuid, {error_id, error_code, nil}, state)
+  end
+  # If error is API or timeout error
+  defp parse_error(task, task_uuid, %{"errorCode" => error_code, "errorDescription" => error_descr, "errorId" => error_id}, state) do
+    proceed_error(task, task_uuid, {error_id, error_code, error_descr}, state)
+  end
+  # Any other (unknown?) errors
+  defp parse_error(task, task_uuid, error, state) do
+    proceed_error(task, task_uuid, {-2, "ERROR_UNKNOWN_ERROR", inspect error}, state)
+  end
+
+  # if ERROR_NO_SLOT_AVAILABLE
+  defp proceed_error(task, task_uuid, {error_id, _error_code, _error_descr}, state) when error_id == 2 do
+    # TODO: Retry
+    state
+  end
+  # if we need to push info
+  defp proceed_error(%{push: true, from: {to, _}, timer: timer} = _task, task_uuid, {error_id, error_code, error_descr}, state) do
+    Process.send(to, {:ex_anti_gate_result, {:error, task_uuid, error_id, error_code, error_descr}}, [])
+    Process.cancel_timer(timer)
+    Map.delete(state, task_uuid)
+  end
+  defp proceed_error(_task, task_uuid, {error_id, error_code, error_descr}, state) do
+    state
+    |> put_in([task_uuid, :result], {error_id, error_code, error_descr})
+    |> put_in([task_uuid, :status], :error)
+  end
+
+  defp gen_task_request(full_task) do
     %{
         clientKey: full_task.api_key,
         softId: "",
         languagePool: full_task.language_pool,
         task: gen_text_task(full_task)
     }
-  end
-
-  defp create_antigate_task(task_uuid, api_host, request) do
-    result = HTTPoison.post("#{api_host}/createTask", Poison.encode!(request), [{"Content-Type", "application/json"}])
-    ExAntiGate.proceed_result(task_uuid, {:api_task_id, result})
   end
 
   defp gen_text_task(full_task) do

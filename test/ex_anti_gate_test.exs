@@ -109,25 +109,41 @@ defmodule ExAntiGateTest do
 
   test "must receive an error after max timeout in case of push: true" do
     task_uuid = ExAntiGate.solve_text_task("", push: true, fake: true)
-    assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, :timeout}}, @defaults_reduced.max_timeout + 10
+    assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, -2, "ERROR_API_TIMEOUT", "Maximum timeout reached, task interrupted"}}, @defaults_reduced.max_timeout + 10
   end
 
   test "task id must be set after initial API call" do
-    with_mock HTTPoison, [post: fn(_url, _request, _headers) ->
-                                        { :ok,
-                                          %HTTPoison.Response{ body: ~S({"errorId":0,"taskId":1234567}),
-                                                            headers: httpoison_headers(),
-                                                            status_code: 200}
-                                        }
-                                     end] do
-
-
-      task_uuid = ExAntiGate.solve_text_task("somestring")
-      task = ExAntiGate.get_task(task_uuid)
-
-      assert called HTTPoison.post(:_, :_, :_)
-      assert ExAntiGate.get_task(task_uuid)[:api_task_id] == 1234567
+    defmodule HTTPoisonTest do
+      def post(_url, _request, _headers) do
+        { :ok,
+          %HTTPoison.Response{  body: ~S({"errorId":0,"taskId":1234567}),
+                                headers: ExAntiGateTest.httpoison_headers(),
+                                status_code: 200}
+        }
+      end
     end
+
+    task_uuid = ExAntiGate.solve_text_task("somestring", http_client: HTTPoisonTest)
+
+    :timer.sleep 50
+
+    assert ExAntiGate.get_task(task_uuid)[:api_task_id] == 1234567
+  end
+
+  test "must receive an error in case of the API error" do
+    defmodule HTTPoisonTest do
+      def post(_url, _request, _headers) do
+        { :ok,
+          %HTTPoison.Response{  body: ~S({"errorId":22,"errorCode":"ERROR_TASK_ABSENT","errorDescription":"Task property is empty or not set. Please refer to API v2 documentation."}),
+                                headers: ExAntiGateTest.httpoison_headers(),
+                                status_code: 200}
+        }
+      end
+    end
+
+    task_uuid = ExAntiGate.solve_text_task("somestring", http_client: HTTPoisonTest, push: true)
+
+    assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, 22, "ERROR_TASK_ABSENT", "Task property is empty or not set. Please refer to API v2 documentation."}}, @defaults_reduced.max_timeout + 10
   end
 
 #  test "try to receive a reply" do
@@ -147,9 +163,10 @@ defmodule ExAntiGateTest do
     |> Map.put(:timer, nil)
     |> Map.delete(:api_key) # we don't want to have it in test
     |> Map.delete(:fake)
+    |> Map.delete(:http_client)
   end
 
-  defp httpoison_headers do
+  def httpoison_headers do
     [  {"Server", "nginx/1.10.2"},
        {"Date", "Sun, 05 Feb 2017 16:26:54 GMT"},
        {"Content-Type", "application/json; charset=utf-8"},

@@ -23,6 +23,7 @@ use Mix.Config
 
 config :ex_anti_gate,
     autostart: true, # Start ExAntiGate process on application start
+    http_client: HTTPoison, # http client - change for testing proposes only
 
     # ############################# task options #####################################
 
