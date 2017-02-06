@@ -26,7 +26,7 @@ defmodule ExAntiGate do
           language_pool: "en",             # "en" (default) - english queue,
                                            # "rn" - Russian, Ukrainian, Belorussian, Kazakh language group
           result_request_interval: 10_000, # result request first attemt interval, in milliseconds
-          result_retry_inteval: 2_000,     # delay between captcha status checks, in milliseconds
+          result_retry_interval: 2_000,     # delay between captcha status checks, in milliseconds
           no_slot_retry_interval: 5_000,   # delay between retries to catch a free slot to proceed captcha, in milliseconds
           no_slot_max_retries: 0,          # number of retries to catch a free slot,
                                            # 0 - until (max_timeout - result_request_inteval) milliseconds gone
@@ -161,6 +161,25 @@ defmodule ExAntiGate do
     {:noreply, state}
   end
 
+  # request task result from API backend
+  @doc false
+  def handle_info({:api_get_task_result, task_uuid}, state) do
+
+    case Map.get(state, task_uuid) do
+      nil -> false
+
+      task ->
+        unless Map.get(task, :fake), do:
+          spawn fn ->
+            "#{task.api_host}/getTaskResult"
+            |> task.http_client.post(Poison.encode!(%{clientKey: task.api_key, taskId: task.api_task_id}), [{"Content-Type", "application/json"}])
+            |> ExAntiGate.proceed_result(task_uuid)
+          end
+    end
+
+    {:noreply, state}
+  end
+
   # handle max timeout
   @doc false
   def handle_info({:cancel_task_timeout, task_uuid}, state) do
@@ -204,8 +223,26 @@ defmodule ExAntiGate do
     proceed_response(task, task_uuid, json_decode_result, state)
   end
   # API task ID
-  defp proceed_response(_task, task_uuid, {:ok, %{"errorId" => 0, "taskId" => api_task_id} = _json_body}, state) do
+  defp proceed_response(task, task_uuid, {:ok, %{"errorId" => 0, "taskId" => api_task_id} = _json_body}, state) do
+    Process.send_after(self(), {:api_get_task_result, task_uuid}, task.result_request_interval)
     put_in(state, [task_uuid, :api_task_id], api_task_id)
+  end
+  # Set a timer to try again if the task is still processing
+  defp proceed_response(task, task_uuid, {:ok, %{"errorId" => 0, "status" => "processing"} = _json_body}, state) do
+    Process.send_after(self(), {:api_get_task_result, task_uuid}, task.result_retry_interval)
+    state
+  end
+  # Deal with result if the task is done and task type is Image
+  # in case of push: true
+  defp proceed_response(
+          %{type: "ImageToTextTask"} = task, task_uuid,
+           {:ok, %{"errorId" => 0, "status" => "ready", "solution" => %{"text" => text}} = _json_body},
+           state) do
+
+    state
+    |> put_in([task_uuid, :result], %{text: text})
+    |> put_in([task_uuid, :status], :ready)
+    |> push_data(task, task_uuid, {:ready, task_uuid, get_in(state, [task_uuid, :result])})
   end
 
   # Any other - probably an error
@@ -254,15 +291,33 @@ defmodule ExAntiGate do
     end
   end
   # if we need to push info
-  defp proceed_error(%{push: true, from: {to, _}, timer: timer} = _task, task_uuid, {error_id, error_code, error_descr}, state) do
-    Process.send(to, {:ex_anti_gate_result, {:error, task_uuid, error_id, error_code, error_descr}}, [])
-    Process.cancel_timer(timer)
-    Map.delete(state, task_uuid)
-  end
-  defp proceed_error(_task, task_uuid, {error_id, error_code, error_descr}, state) do
+#  defp proceed_error(%{push: true, from: {to, _}, timer: timer} = _task, task_uuid, {error_id, error_code, error_descr}, state) do
+#    Process.send(to, {:ex_anti_gate_result, {:error, task_uuid, error_id, error_code, error_descr}}, [])
+#    Process.cancel_timer(timer)
+#    Map.delete(state, task_uuid)
+#  end
+  defp proceed_error(task, task_uuid, {error_id, error_code, error_descr}, state) do
     state
     |> put_in([task_uuid, :result], {error_id, error_code, error_descr})
     |> put_in([task_uuid, :status], :error)
+    |> push_data(task, task_uuid, {:error, task_uuid, error_id, error_code, error_descr})
+  end
+
+  # ####################### #
+  # if we need to push data #
+  # ####################### #
+  defp push_data(state, task, task_uuid, data, delete_task \\ true)
+  defp push_data(state, %{push: true, from: {to, _}, timer: timer} = _task, task_uuid, data, delete_task) do
+    Process.send(to, {:ex_anti_gate_result, data}, [])
+    if delete_task do
+      Process.cancel_timer(timer)
+      Map.delete(state, task_uuid)
+    else
+      state
+    end
+  end
+  defp push_data(state, _task, _task_uuid, _data, _delete_task) do
+    state
   end
 
   # Generate task request

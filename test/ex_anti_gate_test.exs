@@ -14,7 +14,7 @@ defmodule ExAntiGateTest do
     language_pool: "en",             # "en" (default) - english queue,
                                      # "rn" - Russian, Ukrainian, Belorussian, Kazakh language group
     result_request_interval: 10_000, # result request first attemt interval, in milliseconds
-    result_retry_inteval: 2_000,     # delay between captcha status checks, in milliseconds
+    result_retry_interval: 2_000,     # delay between captcha status checks, in milliseconds
     no_slot_retry_interval: 5_000,   # delay between retries to catch a free slot to proceed captcha, in milliseconds
     no_slot_max_retries: 0,          # number of retries to catch a free slot,
                                      # 0 - until (max_timeout - result_request_inteval) milliseconds gone
@@ -46,7 +46,7 @@ defmodule ExAntiGateTest do
 
   @reduced_timeouts %{
     result_request_interval: 10,
-    result_retry_inteval: 2,
+    result_retry_interval: 2,
     no_slot_retry_interval: 5,
     max_timeout: 120,
   }
@@ -114,9 +114,18 @@ defmodule ExAntiGateTest do
 
   test "task id must be set after initial API call" do
     defmodule HTTPoisonTest do
-      def post(_url, _request, _headers) do
+      def post("https://api.anti-captcha.com/createTask", _request, _headers) do
+        :timer.sleep 40
         { :ok,
           %HTTPoison.Response{  body: ~S({"errorId":0,"taskId":1234567}),
+                                headers: ExAntiGateTest.httpoison_headers(),
+                                status_code: 200}
+        }
+      end
+      def post("https://api.anti-captcha.com/getTaskResult", _request, _headers) do
+        :timer.sleep 10
+        { :ok,
+          %HTTPoison.Response{  body: ~S({"errorId":0,"status":"ready","solution":{"text":"deditur","url":"http://61.39.233.233/1/147220556452507.jpg"},"cost":"0.000700","ip":"46.98.54.221","createTime":1472205564,"endTime":1472205570,"solveCount":"0"}),
                                 headers: ExAntiGateTest.httpoison_headers(),
                                 status_code: 200}
         }
@@ -132,9 +141,18 @@ defmodule ExAntiGateTest do
 
   test "must receive an error in case of the API error" do
     defmodule HTTPoisonTest do
-      def post(_url, _request, _headers) do
+      def post("https://api.anti-captcha.com/createTask", _request, _headers) do
+        :timer.sleep 50
         { :ok,
           %HTTPoison.Response{  body: ~S({"errorId":22,"errorCode":"ERROR_TASK_ABSENT","errorDescription":"Task property is empty or not set. Please refer to API v2 documentation."}),
+                                headers: ExAntiGateTest.httpoison_headers(),
+                                status_code: 200}
+        }
+      end
+      def post("https://api.anti-captcha.com/getTaskResult", _request, _headers) do
+        :timer.sleep 10
+        { :ok,
+          %HTTPoison.Response{  body: ~S({"errorId":0,"status":"ready","solution":{"text":"deditur","url":"http://61.39.233.233/1/147220556452507.jpg"},"cost":"0.000700","ip":"46.98.54.221","createTime":1472205564,"endTime":1472205570,"solveCount":"0"}),
                                 headers: ExAntiGateTest.httpoison_headers(),
                                 status_code: 200}
         }
@@ -148,9 +166,18 @@ defmodule ExAntiGateTest do
 
   test "must retry if there is no free slot available" do
     defmodule HTTPoisonTest do
-      def post(_url, _request, _headers) do
+      def post("https://api.anti-captcha.com/createTask", _request, _headers) do
+        :timer.sleep 1
         { :ok,
           %HTTPoison.Response{  body: ~S({"errorId":2,"errorCode":"ERROR_NO_SLOT_AVAILABLE","errorDescription":"Doesn't matter"}),
+                                headers: ExAntiGateTest.httpoison_headers(),
+                                status_code: 200}
+        }
+      end
+      def post("https://api.anti-captcha.com/getTaskResult", _request, _headers) do
+        :timer.sleep 10
+        { :ok,
+          %HTTPoison.Response{  body: ~S({"errorId":0,"status":"ready","solution":{"text":"deditur","url":"http://61.39.233.233/1/147220556452507.jpg"},"cost":"0.000700","ip":"46.98.54.221","createTime":1472205564,"endTime":1472205570,"solveCount":"0"}),
                                 headers: ExAntiGateTest.httpoison_headers(),
                                 status_code: 200}
         }
@@ -167,6 +194,39 @@ defmodule ExAntiGateTest do
     refute task.no_slot_attempts == 0
 
     assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, -3, "ERROR_NO_SLOT_MAX_RETRIES", "Maximum attempts to catch free slot reached, task interrupted."}}, @defaults_reduced.max_timeout + 20
+
+  end
+
+  test "captcha must be solved in the end" do
+    defmodule HTTPoisonTest2 do
+      def post("https://api.anti-captcha.com/createTask", _request, _headers) do
+        :timer.sleep 10
+        { :ok,
+          %HTTPoison.Response{  body: ~S({"errorId":0,"taskId":1234567}),
+                                headers: ExAntiGateTest.httpoison_headers(),
+                                status_code: 200}
+        }
+      end
+      def post("https://api.anti-captcha.com/getTaskResult", _request, _headers) do
+        :timer.sleep 10
+        { :ok,
+          %HTTPoison.Response{  body: ~S({"errorId":0,"status":"ready","solution":{"text":"deditur","url":"http://61.39.233.233/1/147220556452507.jpg"},"cost":"0.000700","ip":"46.98.54.221","createTime":1472205564,"endTime":1472205570,"solveCount":"0"}),
+                                headers: ExAntiGateTest.httpoison_headers(),
+                                status_code: 200}
+        }
+      end
+    end
+
+    task_uuid = ExAntiGate.solve_text_task("somestring", http_client: HTTPoisonTest2)
+
+    :timer.sleep 70
+
+    task = ExAntiGate.get_task(task_uuid)
+
+    assert task.status == :ready
+    refute task.result == %{text: "deditour"}
+
+#    assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, -3, "ERROR_NO_SLOT_MAX_RETRIES", "Maximum attempts to catch free slot reached, task interrupted."}}, @defaults_reduced.max_timeout + 20
 
   end
 
