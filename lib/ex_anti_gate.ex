@@ -107,7 +107,7 @@ defmodule ExAntiGate do
   end
 
   @doc false
-  def proceed_result(task_uuid, result) do
+  def proceed_result(result, task_uuid) do
     GenServer.cast(__MODULE__, {:proceed_result, task_uuid, result})
   end
 
@@ -126,40 +126,13 @@ defmodule ExAntiGate do
   def handle_call({:solve_text, image, options}, from, state) do
     task_uuid = generate()
     options = merge_options(options)
-    timer = Process.send_after(self(), {:cancel_task, task_uuid}, options.max_timeout)
+    timer = Process.send_after(self(), {:cancel_task_timeout, task_uuid}, options.max_timeout)
 
     task = Map.merge(options, %{from: from, image: image, type: "ImageToTextTask", timer: timer})
 
-    unless Map.get(task, :fake), do:
-        spawn fn ->
-          result = task.http_client.post("#{task.api_host}/createTask", Poison.encode!(gen_task_request(task)), [{"Content-Type", "application/json"}])
-          ExAntiGate.proceed_result(task_uuid, result)
-        end
-
-#    GenServer.cast(__MODULE__, {:proceed_text_task, task_uuid})
+    Process.send(self(), {:api_create_task, task_uuid}, [])
 
     {:reply, task_uuid, Map.merge(state, %{task_uuid => task})}
-  end
-
-  # Get image from state, send request to antigate and
-  @doc false
-  def handle_cast({:proceed_text_task, _task_uuid}, state) do
-
-#    task = state[task_uuid]
-
-#    :timer.sleep(task.max_timeout)
-    # TODO: actual image solving
-
-#    state =
-#      if state[task_uuid].push do
-#        {from_pid, _} = task.from
-#        GenServer.cast(from_pid, {:antigate_result, task_uuid})
-#        state |> Map.delete(task_uuid)
-#      else
-#        state
-#      end
-
-    {:noreply, state}
   end
 
   @doc false
@@ -169,13 +142,42 @@ defmodule ExAntiGate do
     {:noreply, state}
   end
 
+  # create task on API backend
+  @doc false
+  def handle_info({:api_create_task, task_uuid}, state) do
+
+    case Map.get(state, task_uuid) do
+      nil -> false
+
+      task ->
+        unless Map.get(task, :fake), do:
+          spawn fn ->
+            "#{task.api_host}/createTask"
+            |> task.http_client.post(Poison.encode!(gen_task_request(task)), [{"Content-Type", "application/json"}])
+            |> ExAntiGate.proceed_result(task_uuid)
+          end
+    end
+
+    {:noreply, state}
+  end
+
   # handle max timeout
   @doc false
-  def handle_info({:cancel_task, task_uuid}, state) do
-
+  def handle_info({:cancel_task_timeout, task_uuid}, state) do
     state =
       task_uuid
-      |> parse_error(%{"errorId" => -2, "errorCode" => "ERROR_API_TIMEOUT", "errorDescription" => "Maximum timeout reached, task interrupted"}, state)
+      |> parse_error(%{"errorId" => -2, "errorCode" => "ERROR_API_TIMEOUT", "errorDescription" => "Maximum timeout reached, task interrupted."}, state)
+      |> Map.delete(task_uuid)
+
+    {:noreply, state}
+  end
+
+  # handle max timeout
+  @doc false
+  def handle_info({:cancel_task_no_slot, task_uuid}, state) do
+    state =
+      task_uuid
+      |> parse_error(%{"errorId" => -3, "errorCode" => "ERROR_NO_SLOT_MAX_RETRIES", "errorDescription" => "Maximum attempts to catch free slot reached, task interrupted."}, state)
       |> Map.delete(task_uuid)
 
     {:noreply, state}
@@ -241,10 +243,15 @@ defmodule ExAntiGate do
     proceed_error(task, task_uuid, {-2, "ERROR_UNKNOWN_ERROR", inspect error}, state)
   end
 
-  # if ERROR_NO_SLOT_AVAILABLE
+  # if ERROR_NO_SLOT_AVAILABLE retry after `no_slot_retry_interval` and increment `no_slot_attempts`
   defp proceed_error(task, task_uuid, {error_id, _error_code, _error_descr}, state) when error_id == 2 do
-    # TODO: Retry
-    state
+    if task.no_slot_max_retries == 0 or task.no_slot_attempts <= task.no_slot_max_retries do
+      Process.send_after(self(), {:api_create_task, task_uuid}, task.no_slot_retry_interval)
+      update_in(state, [task_uuid, :no_slot_attempts], &(&1 + 1))
+    else
+      Process.send(self(), {:cancel_task_no_slot, task_uuid}, [])
+      state
+    end
   end
   # if we need to push info
   defp proceed_error(%{push: true, from: {to, _}, timer: timer} = _task, task_uuid, {error_id, error_code, error_descr}, state) do
@@ -281,7 +288,7 @@ defmodule ExAntiGate do
        maxLength: full_task.max_length,
     }
   end
-  defp gen_task(%{type: "ImageToTextTask"} = full_task) do
+  defp gen_task(_full_task) do
     %{}
   end
 

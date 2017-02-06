@@ -108,7 +108,8 @@ defmodule ExAntiGateTest do
 
   test "must receive an error after max timeout in case of push: true" do
     task_uuid = ExAntiGate.solve_text_task("", push: true, fake: true)
-    assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, -2, "ERROR_API_TIMEOUT", "Maximum timeout reached, task interrupted"}}, @defaults_reduced.max_timeout + 10
+    assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, -2, "ERROR_API_TIMEOUT", "Maximum timeout reached, task interrupted."}}, @defaults_reduced.max_timeout + 50
+    assert is_nil ExAntiGate.get_task(task_uuid)
   end
 
   test "task id must be set after initial API call" do
@@ -156,14 +157,16 @@ defmodule ExAntiGateTest do
       end
     end
 
-    task_uuid = ExAntiGate.solve_text_task("somestring", http_client: HTTPoisonTest)
-
-    task = ExAntiGate.get_task(task_uuid)
+    task_uuid = ExAntiGate.solve_text_task("somestring", http_client: HTTPoisonTest, no_slot_max_retries: 10, push: true)
 
     :timer.sleep 50
 
+    task = ExAntiGate.get_task(task_uuid)
+
     assert task.api_task_id == nil
     refute task.no_slot_attempts == 0
+
+    assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, -3, "ERROR_NO_SLOT_MAX_RETRIES", "Maximum attempts to catch free slot reached, task interrupted."}}, @defaults_reduced.max_timeout + 20
 
   end
 
