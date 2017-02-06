@@ -117,6 +117,7 @@ defmodule ExAntiGate do
 
   @doc false
   def handle_call({:get_task, task_uuid}, _from, state) do
+    Logger.debug "ExAntiGate: get_task call, uuid: #{task_uuid}"
     {:reply, Map.get(state, task_uuid), state}
   end
 
@@ -132,6 +133,8 @@ defmodule ExAntiGate do
 
     Process.send(self(), {:api_create_task, task_uuid}, [])
 
+    Logger.debug "ExAntiGate: solve_text call, uuid: #{task_uuid}"
+
     {:reply, task_uuid, Map.merge(state, %{task_uuid => task})}
   end
 
@@ -145,16 +148,16 @@ defmodule ExAntiGate do
   # create task on API backend
   @doc false
   def handle_info({:api_create_task, task_uuid}, state) do
-
     case Map.get(state, task_uuid) do
       nil -> false
 
       task ->
         unless Map.get(task, :fake), do:
           spawn fn ->
-            "#{task.api_host}/createTask"
-            |> task.http_client.post(Poison.encode!(gen_task_request(task)), [{"Content-Type", "application/json"}])
-            |> ExAntiGate.proceed_result(task_uuid)
+            Logger.debug "ExAntiGate: api_create_task call, sending request, uuid: #{task_uuid}"
+            response = task.http_client.post("#{task.api_host}/createTask", Poison.encode!(gen_task_request(task)), [{"Content-Type", "application/json"}])
+            Logger.debug "ExAntiGate: api_create_task call, got response, uuid: #{task_uuid}, response: #{inspect response}"
+            ExAntiGate.proceed_result(response, task_uuid)
           end
     end
 
@@ -171,9 +174,10 @@ defmodule ExAntiGate do
       task ->
         unless Map.get(task, :fake), do:
           spawn fn ->
-            "#{task.api_host}/getTaskResult"
-            |> task.http_client.post(Poison.encode!(%{clientKey: task.api_key, taskId: task.api_task_id}), [{"Content-Type", "application/json"}])
-            |> ExAntiGate.proceed_result(task_uuid)
+            Logger.debug "ExAntiGate: api_get_task_result call, sending request, uuid: #{task_uuid}"
+            response = task.http_client.post("#{task.api_host}/getTaskResult", Poison.encode!(%{clientKey: task.api_key, taskId: task.api_task_id}), [{"Content-Type", "application/json"}])
+            Logger.debug "ExAntiGate: api_get_task_result call, got response, uuid: #{task_uuid}, response: #{inspect response}"
+            ExAntiGate.proceed_result(response, task_uuid)
           end
     end
 

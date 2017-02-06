@@ -20,6 +20,8 @@ use Mix.Config
 #
 #     config :logger, level: :info
 #
+config :logger,
+    level: :debug
 
 config :ex_anti_gate,
     autostart: true, # Start ExAntiGate process on application start
