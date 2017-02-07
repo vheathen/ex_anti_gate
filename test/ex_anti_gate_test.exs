@@ -4,6 +4,7 @@ defmodule ExAntiGateTest do
   require Logger
 
   import ExAntiGateTest.Config
+  alias ExAntiGate.Config
 
   doctest ExAntiGate
 
@@ -168,7 +169,7 @@ defmodule ExAntiGateTest do
 
     task_uuid = ExAntiGate.solve_text_task("somestring", http_client: HTTPoisonTest)
 
-    :timer.sleep 70
+    :timer.sleep 100
 
     task = ExAntiGate.get_task(task_uuid)
 

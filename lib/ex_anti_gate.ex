@@ -10,7 +10,9 @@ defmodule ExAntiGate do
 
   ## Configuration
   The Antigate client has to be configured. At least `api_key` MUST be set, otherwise the client
-  is shutting down with a notice.
+  is shutting down with a notice. It's possible to set it in config file or via environment variable
+  `EX_ANTI_GATE_API_KEY`. Note: in case of both (system and config) options exist at the same time
+  the environment variable value will be used.
 
   Default options look like this:
 
@@ -100,6 +102,8 @@ defmodule ExAntiGate do
   use GenServer
   require Logger
   import Ecto.UUID, only: [generate: 0]
+
+  alias ExAntiGate.Config
 
   # #########################################################
   # Client API
@@ -394,8 +398,7 @@ defmodule ExAntiGate do
   end
 
   defp merge_options(options) do
-    :ex_anti_gate
-    |> Application.get_all_env()
+    Config.get_all_env()
     |> Enum.concat(options)
     |> Enum.into(%{})
     |> Map.delete(:included_applications)
