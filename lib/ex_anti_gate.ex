@@ -107,7 +107,6 @@ defmodule ExAntiGate do
 
   @doc """
   Starts the antigate client linked process
-  Can be used if `:autostart` config option set to `false`
   """
   def start_link(initial_state \\ %{}) do
     GenServer.start_link(__MODULE__, initial_state, name: __MODULE__)
@@ -115,10 +114,9 @@ defmodule ExAntiGate do
 
   @doc """
   Starts the antigate client process
-  Can be used if `:autostart` config option set to `false`
   """
   def start(initial_state \\ %{}) do
-    GenServer.start_link(__MODULE__, initial_state, name: __MODULE__)
+    GenServer.start(__MODULE__, initial_state, name: __MODULE__)
   end
 
   @doc """
