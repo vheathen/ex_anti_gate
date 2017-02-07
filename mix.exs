@@ -15,7 +15,7 @@ defmodule ExAntiGate.Mixfile do
      description: "Elixir AntiGate.com (anti-captcha.com) captcha solving service API client",
      package: [
              name: :ex_anti_gate,
-             files: ["lib", "config/config.exs", "mix.exs", "README*", "LICENSE*"],
+             files: ["lib", "mix.exs", "README*", "LICENSE*"],
              maintainers: ["Vladimir Drobyshevskiy"],
              licenses: ["MIT"],
              links: %{ "GitHub" => "https://github.com/vheathen/ex_anti_gate" },
@@ -32,7 +32,7 @@ defmodule ExAntiGate.Mixfile do
   # Type "mix help compile.app" for more information
   def application do
     # Specify extra applications you'll use from Erlang/Elixir
-    [ mod: {ExAntiGate.App, []},
+    [ mod: {ExAntiGate.Application, []},
       extra_applications: [:logger]]
   end
 
