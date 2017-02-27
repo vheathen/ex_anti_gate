@@ -3,3 +3,5 @@ elixir:
   - 1.4.1
 otp_release:
   - 19.2
+env:
+  - EX_ANTI_GATE_API_KEY=somekeydoesntmatter
