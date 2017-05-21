@@ -3,7 +3,7 @@ defmodule ExAntiGate.Mixfile do
 
   def project do
     [app: :ex_anti_gate,
-     version: "0.3.0",
+     version: "0.3.1",
      elixir: "~> 1.4",
      elixirc_paths: elixirc_paths(Mix.env),
      build_embedded: Mix.env == :prod,
@@ -49,7 +49,7 @@ defmodule ExAntiGate.Mixfile do
     [
       {:httpoison, "~> 0.11.0"},
       {:ecto, "~> 2.1", runtime: false},
-      {:poison, "~> 2.0"},
+      {:poison, "~> 1.5 or ~> 2.0"},
       {:ex_doc, "~> 0.14", only: :dev},
       {:dogma, "~> 0.0", only: [:test]},
       {:mix_test_watch, "~> 0.0", runtime: false, only: [:dev]},
