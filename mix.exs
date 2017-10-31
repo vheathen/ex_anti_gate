@@ -3,7 +3,7 @@ defmodule ExAntiGate.Mixfile do
 
   def project do
     [app: :ex_anti_gate,
-     version: "0.3.2",
+     version: "0.3.3",
      elixir: "~> 1.4",
      elixirc_paths: elixirc_paths(Mix.env),
      build_embedded: Mix.env == :prod,
@@ -47,7 +47,7 @@ defmodule ExAntiGate.Mixfile do
   # Type "mix help deps" for more examples and options
   defp deps do
     [
-      {:httpoison, "~> 0.11.0"},
+      {:httpoison, "~> 0.13.0"},
       {:ecto, "~> 2.1", runtime: false},
       {:poison, "~> 1.5 or ~> 2.0 or ~> 3.0"},
       {:ex_doc, "~> 0.14", only: :dev},
