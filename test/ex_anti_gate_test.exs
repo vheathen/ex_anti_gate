@@ -4,7 +4,7 @@ defmodule ExAntiGateTest do
   require Logger
 
   import ExAntiGateTest.Config
-  alias ExAntiGate.Config
+#  alias ExAntiGate.Config
 
   doctest ExAntiGate
 
@@ -143,7 +143,7 @@ defmodule ExAntiGateTest do
     assert task.api_task_id == nil
     refute task.no_slot_attempts == 0
 
-    assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, -3, "ERROR_NO_SLOT_MAX_RETRIES", "Maximum attempts to catch free slot reached, task interrupted."}}, defaults_reduced().max_timeout + 20
+    assert_receive {:ex_anti_gate_result, {:error, ^task_uuid, -3, "ERROR_NO_SLOT_MAX_RETRIES", "Maximum attempts to catch free slot reached, task interrupted."}}, defaults_reduced().max_timeout + 50
 
   end
 

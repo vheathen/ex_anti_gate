@@ -3,8 +3,8 @@ defmodule ExAntiGate.Mixfile do
 
   def project do
     [app: :ex_anti_gate,
-     version: "0.3.3",
-     elixir: "~> 1.4",
+     version: "0.3.4",
+     elixir: "~> 1.7",
      elixirc_paths: elixirc_paths(Mix.env),
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
@@ -36,23 +36,13 @@ defmodule ExAntiGate.Mixfile do
       extra_applications: [:logger]]
   end
 
-  # Dependencies can be Hex packages:
-  #
-  #   {:my_dep, "~> 0.3.0"}
-  #
-  # Or git/path repositories:
-  #
-  #   {:my_dep, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
-  #
-  # Type "mix help deps" for more examples and options
   defp deps do
     [
-      {:httpoison, "~> 0.13.0"},
-      {:ecto, "~> 2.1", runtime: false},
-      {:poison, "~> 1.5 or ~> 2.0 or ~> 3.0"},
-      {:ex_doc, "~> 0.14", only: :dev},
-      {:dogma, "~> 0.0", only: [:test]},
-      {:mix_test_watch, "~> 0.0", runtime: false, only: [:dev]},
+      {:httpoison, "~> 1.5"},
+      {:elixir_uuid, "~> 1.2.0"},
+      {:jason, "~> 1.0"},
+      {:ex_doc, "~> 0.21.1", only: :dev},
+      {:mix_test_watch, "~> 0.9", runtime: false, only: [:dev]},
     ]
   end
 end

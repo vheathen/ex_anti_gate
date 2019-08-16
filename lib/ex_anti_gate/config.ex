@@ -83,7 +83,7 @@ defmodule ExAntiGate.Config do
   If the value cannot be converted to an integer, the
   default is returned instead.
   """
-  @spec get_integer(atom(), atom(), integer()) :: integer
+  @spec get_integer(atom(), atom(), integer() | nil) :: integer() | nil
   def get_integer(app, key, default \\ nil) do
     case get(app, key, nil) do
       nil -> default

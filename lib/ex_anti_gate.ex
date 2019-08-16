@@ -101,7 +101,6 @@ defmodule ExAntiGate do
 
   use GenServer
   require Logger
-  import Ecto.UUID, only: [generate: 0]
 
   alias ExAntiGate.Config
 
@@ -127,7 +126,6 @@ defmodule ExAntiGate do
   Creates a new task for a text captcha image
   Returns a UUID string as a task id
   """
-  @spec solve_text_task(String.t(), List) :: String.t()
   def solve_text_task(image, options \\ []) do
     GenServer.call(__MODULE__, {:solve_text, image, options})
   end
@@ -158,6 +156,10 @@ defmodule ExAntiGate do
   # Server API
   # #########################################################
 
+  def init(args) do
+    {:ok, args}
+  end
+
   @doc false
   def handle_call({:get_task, task_uuid}, _from, state) do
     Logger.debug "ExAntiGate: get_task call, uuid: #{task_uuid}"
@@ -174,7 +176,7 @@ defmodule ExAntiGate do
   # and return task uuid
   @doc false
   def handle_call({:solve_text, image, options}, from, state) do
-    task_uuid = generate()
+    task_uuid = UUID.uuid4()
     options = merge_options(options)
     timer = Process.send_after(self(), {:cancel_task_timeout, task_uuid}, options.max_timeout)
 
@@ -203,7 +205,7 @@ defmodule ExAntiGate do
       task ->
         unless Map.get(task, :fake), do:
           spawn fn ->
-            task_request = Poison.encode!(gen_task_request(task))
+            task_request = Jason.encode!(gen_task_request(task))
 
             Logger.debug "ExAntiGate: api_create_task call, sending request, uuid: #{task_uuid}, request: #{task_request}"
             response = task.http_client.post("#{task.api_host}/createTask", task_request, [{"Content-Type", "application/json"}])
@@ -226,7 +228,7 @@ defmodule ExAntiGate do
         unless Map.get(task, :fake), do:
           spawn fn ->
             Logger.debug "ExAntiGate: api_get_task_result call, sending request, uuid: #{task_uuid}"
-            response = task.http_client.post("#{task.api_host}/getTaskResult", Poison.encode!(%{clientKey: task.api_key, taskId: task.api_task_id}), [{"Content-Type", "application/json"}])
+            response = task.http_client.post("#{task.api_host}/getTaskResult", Jason.encode!(%{clientKey: task.api_key, taskId: task.api_task_id}), [{"Content-Type", "application/json"}])
             Logger.debug "ExAntiGate: api_get_task_result call, got response, uuid: #{task_uuid}, response: #{inspect response}"
             ExAntiGate.proceed_result(response, task_uuid)
           end
@@ -274,7 +276,7 @@ defmodule ExAntiGate do
   end
   # Got a normal HTTP response
   defp proceed_response(task, task_uuid, {:ok, %HTTPoison.Response{body: body, status_code: 200}} = _response, state) do
-    json_decode_result = Poison.decode(body)
+    json_decode_result = Jason.decode(body)
     proceed_response(task, task_uuid, json_decode_result, state)
   end
   # API task ID
