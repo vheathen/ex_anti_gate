@@ -1,5 +1,7 @@
 # ExAntiGate
 
+[![Build Status](https://travis-ci.org/vheathen/ex_anti_gate.svg?branch=master)](https://travis-ci.org/vheathen/ex_anti_gate)
+
 ## Disclaimer
 This project has been intended for fair use only. It's not allowed to use it for any destructive, 
 anti-social and/or illegal activity.
