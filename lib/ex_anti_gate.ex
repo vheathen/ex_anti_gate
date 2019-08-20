@@ -231,59 +231,6 @@ defmodule ExAntiGate do
     {:reply, task_uuid, Map.put(state, task_uuid, request)}
   end
 
-  def handle_call({:no_captcha_proxyless, task_options}, from, state) do
-    task =
-      task_options
-      |> Keyword.put(:type, "NoCaptchaTaskProxyless")
-      |> gen_task(ExAntiGate.Tasks.NoCaptchaTaskProxyless)
-
-    %{
-      task_uuid: task_uuid,
-      request: request
-    } = prepare_task_request(task_options, task, from)
-
-    Logger.debug "ExAntiGate: solve_text call, uuid: #{task_uuid}"
-
-    {:reply, task_uuid, Map.put(state, task_uuid, request)}
-  end
-
-  def handle_call({:no_captcha, task_options}, from, state) do
-    task =
-      task_options
-      |> Keyword.put(:type, "NoCaptchaTask")
-      |> gen_task(ExAntiGate.Tasks.NoCaptchaTask)
-
-    %{
-      task_uuid: task_uuid,
-      request: request
-    } = prepare_task_request(task_options, task, from)
-
-    Logger.debug "ExAntiGate: solve_text call, uuid: #{task_uuid}"
-
-    {:reply, task_uuid, Map.put(state, task_uuid, request)}
-  end
-
-  # generate task uuid, put image data into state, send request to antigate
-  # and return task uuid
-  @doc false
-  def handle_call({:solve_text, image, task_options}, from, state) do
-
-    task =
-      task_options
-      |> Keyword.put(:body, image)
-      |> Keyword.put(:type, "ImageToTextTask")
-      |> gen_task(ExAntiGate.Tasks.ImageToTextTask)
-
-    %{
-      task_uuid: task_uuid,
-      request: request
-    } = prepare_task_request(task_options, task, from)
-
-    Logger.debug "ExAntiGate: solve_text call, uuid: #{task_uuid}"
-
-    {:reply, task_uuid, Map.put(state, task_uuid, request)}
-  end
-
   @doc false
   def handle_cast({:proceed_result, task_uuid, result}, state) do
     state = proceed_response(task_uuid, result, state)
@@ -391,8 +338,7 @@ defmodule ExAntiGate do
     Process.send_after(self(), {:api_get_task_result, task_uuid}, task.result_retry_interval)
     state
   end
-  # Deal with result if the task is done and task type is Image
-  # in case of push: true
+  # Deal with result if the task is done
   defp proceed_response(
             task,
             task_uuid,
@@ -442,7 +388,7 @@ defmodule ExAntiGate do
   end
 
   # if ERROR_NO_SLOT_AVAILABLE retry after `no_slot_retry_interval` and increment `no_slot_attempts`
-  defp proceed_error(task, task_uuid, {error_id, _error_code, _error_descr}, state) when error_id == 2 do
+  defp proceed_error(task, task_uuid, {2 = _error_id, _error_code, _error_descr}, state) do
     if task.no_slot_max_retries == 0 or task.no_slot_attempts <= task.no_slot_max_retries do
       Process.send_after(self(), {:api_create_task, task_uuid}, task.no_slot_retry_interval)
       update_in(state, [task_uuid, :no_slot_attempts], &(&1 + 1))
@@ -509,7 +455,7 @@ defmodule ExAntiGate do
   end
 
   # Generate task object
-  def gen_task([_|_] = task_options, module) do
+  defp gen_task([_|_] = task_options, module) do
     require Logger
 
     module.defaults()
