@@ -8,14 +8,43 @@ defmodule ExAntiGate do
   This project has been intended for fair use only. It's not allowed to use it for any destructive,
   anti-social and/or illegal activity.
 
+  ## Description
+  Unofficial [anti-captcha.com](http://anti-captcha.com)
+  ([antigate.com](http://antigate.com)) API client for Elixir. The antigate service solves
+  captchas by human workers.
+
+  Supports:
+  - **ImageToTextTask** : solve usual image captcha
+  - **NoCaptchaTask** : Google Recaptcha puzzle solving
+  - **NoCaptchaTaskProxyless** : Google Recaptcha puzzle solving without proxies
+  - **RecaptchaV3TaskProxyless** : Google Recaptcha v.3
+  - **FunCaptchaTask** - rotating captcha funcaptcha.com
+  - **FunCaptchaTaskProxyless** - funcaptcha without proxy
+  - **SquareNetTextTask** : select objects on image with an overlay grid
+
+
+  ## Installation
+  Add it to your dependencies:
+
+  ```elixir
+  # mix.exs
+  def deps do
+    [{:ex_anti_gate, "~> 0.4"}]
+  end
+  ```
+
+  end fetch it with `mix deps.get`.
+
   ## Configuration
   The Antigate client has to be configured. At least `api_key` MUST be set, otherwise the client
   is shutting down with a notice. It's possible to set it in config file or via environment variable
   `EX_ANTI_GATE_API_KEY`. Note: in case of both (system and config) options exist at the same time
   the environment variable value will be used.
 
-  Default options look like this:
+  Since 0.4 version now settings split into common and task specific parts.
 
+  Default common options look like this:
+  ```elixir
       config :ex_anti_gate,
           autostart: true, # Start ExAntiGate process on application start
           http_client: HTTPoison, # http client - change for testing proposes only
@@ -25,40 +54,50 @@ defmodule ExAntiGate do
           api_key: nil,
           api_host: "https://api.anti-captcha.com",
           language_pool: "en",             # "en" (default) - english queue,
-                                           # "rn" - Russian, Ukrainian, Belorussian, Kazakh language group
+                                          # "rn" - Russian, Ukrainian, Belorussian, Kazakh language group
           result_request_interval: 10_000, # result request first attemt interval, in milliseconds
           result_retry_interval: 2_000,     # delay between captcha status checks, in milliseconds
           no_slot_retry_interval: 5_000,   # delay between retries to catch a free slot to proceed captcha, in milliseconds
           no_slot_max_retries: 0,          # number of retries to catch a free slot,
-                                           # 0 - until (max_timeout - result_request_inteval) milliseconds gone
+                                          # 0 - until (max_timeout - result_request_inteval) milliseconds gone
           max_timeout: 120_000,            # captcha recognition maximum timeout;
-                                           # the result value must be read during this period
-          phrase: false,                   # does captcha have one or more spaces
-          case: false,                     # captcha is case sensetive
-          numeric: 0,                      # 0 - any symbols
-                                           # 1 - captcha has digits only
-                                           # 2 - captcha has any symbols EXCEPT digits
-          math: false,                     # captcha is a math equation and it's necessary to solve it and enter result
-          min_length: 0,                   # 0 - has no limits
-                                           # > 0 - an integer sets minimum captcha length
-          max_length: 0, # 0 - has no limits
-                         # > 0 - an integer sets maximum captcha length
+                                          # the result value must be read during this period
           push: false    # do not reply to the sender by default (wait for a result request)
+  ```
 
-  ## Using
+  Default tasks options exists for ImageToTextTask only but you can set any options you need the same way:
+  ```elixir
+      config :ex_anti_gate,
+          :image_to_text:
+            [
+              phrase: false,                   # does captcha have one or more spaces
+              case: false,                     # captcha is case sensetive
+              numeric: 0,                      # 0 - any symbols
+                                              # 1 - captcha has digits only
+                                              # 2 - captcha has any symbols EXCEPT digits
+              math: false,                     # captcha is a math equation and it's necessary to solve it and enter result
+              min_length: 0,                   # 0 - has no limits
+                                              # > 0 - an integer sets minimum captcha length
+              max_length: 0, # 0 - has no limits
+                            # > 0 - an integer sets maximum captcha length
+            ]
+  ```
+
+  ## How to use
   It is possible to use it in standard and push mode.
 
-  In standard mode you send a task request with `ExAntiGate.solve_text_task/2` function and then can
+  In standard mode you send a task request with `ExAntiGate.solve_captcha/2` function and then can
   request current result with `ExAntiGate.get_task_result/1` or a full task stack with `ExAntiGate.get_task/1`.
   `get_task_result/1` is preferable.
 
   In push mode you should wait for two kind of tuples:
-    * `{:ex_anti_gate_result, {:ready, task_uuid :: String.t(), result :: any}}` in case of successfull task or
+    * `{:ex_anti_gate_result, {:ready, task_uuid :: String.t(), response :: any}}` in case of successfull task or
     * `{:ex_anti_gate_result, {:error, task_uuid :: String.t(), error_id :: integer, error_code :: String.t(), error_description :: String.t()}}` - in
-   case of any errors.
+  case of any errors.
 
   For example:
 
+  ```elixir
       defmodule MyCaptchaDispatcher do
         use GenServer
 
@@ -66,7 +105,7 @@ defmodule ExAntiGate do
 
         # Server API
 
-        def handle_info({:ex_anti_gate_result, {:ready, task_uuid, %{text: text} = _result}}, state) do
+        def handle_info({:ex_anti_gate_result, {:ready, task_uuid, %{"solution" => %{"text" => text}} = _response}}, state) do
           # deal with captcha text
         end
 
@@ -75,13 +114,17 @@ defmodule ExAntiGate do
         end
 
       end
-
+  ```
   Please beware that in push mode task data disappear right after message is sent without any kind of delivery check and
   in standard mode task data disappear after `max_timeout` amount of time.
+
+  Please check available task options in the [Antigate tasks documentation](https://anticaptcha.atlassian.net/wiki/spaces/API/pages/5079084/Captcha+Task+Types).
+  Parameters send as Keyword (so all keys are atoms), please, mind parameters case.
 
   ## Errors
   You can find most errors description in the [Antigate documentation](https://anticaptcha.atlassian.net/wiki/display/API/Errors).
   A number of errors came from this client implementation and have negative codes:
+
   `error_id`: -1, `error_code`: "ERROR_UNKNOWN_ERROR",       `error_description`: will be taken from the error source
   `error_id`: -2, `error_code`: "ERROR_API_TIMEOUT",         `error_description`: "Maximum timeout reached, task interrupted."
   `error_id`: -3, `error_code`: "ERROR_NO_SLOT_MAX_RETRIES", `error_description`: "Maximum attempts to catch free slot reached, task interrupted."
@@ -92,10 +135,10 @@ defmodule ExAntiGate do
                     from: nil,
                     timer: nil,
                     type: nil,
-                    image: nil,
+                    task: nil,
                     no_slot_attempts: 0,
                     status: :waiting, # or :ok, or :error
-                    result: :none,
+                    response: :none,
                     api_task_id: nil
                   }
 
@@ -123,11 +166,14 @@ defmodule ExAntiGate do
   end
 
   @doc """
-  Creates a new task for a text captcha image
+  Creates a new task for a captcha. Expects captcha task type and task options
+  as in [Antigate documentation](https://anticaptcha.atlassian.net/wiki/spaces/API/pages/5079084/Captcha+Task+Types)
+
   Returns a UUID string as a task id
   """
-  def solve_text_task(image, options \\ []) do
-    GenServer.call(__MODULE__, {:solve_text, image, options})
+  @spec solve_captcha(type :: String.t(), task_options :: Keyword.t()) :: String.t()
+  def solve_captcha(type, task_options \\ []) do
+    GenServer.call(__MODULE__, {:create_task, type, task_options})
   end
 
   @doc """
@@ -169,24 +215,76 @@ defmodule ExAntiGate do
   @doc false
   def handle_call({:get_task_result, task_uuid}, _from, state) do
     Logger.debug "ExAntiGate: get_task_result call, uuid: #{task_uuid}"
-    {:reply, {get_in(state, [task_uuid, :status]), get_in(state, [task_uuid, :result])}, state}
+    {:reply, {get_in(state, [task_uuid, :status]), get_in(state, [task_uuid, :response])}, state}
+  end
+
+  def handle_call({:create_task, type, task_options}, from, state) do
+    task =
+      task_options
+      |> Keyword.put(:type, type)
+      |> gen_task("Elixir.ExAntiGate.Tasks.#{type}" |> String.to_existing_atom())
+
+    %{
+      task_uuid: task_uuid,
+      request: request
+    } = prepare_task_request(task_options, task, from)
+
+    Logger.debug "ExAntiGate: #{type} call, uuid: #{task_uuid}"
+
+    {:reply, task_uuid, Map.put(state, task_uuid, request)}
+  end
+
+  def handle_call({:no_captcha_proxyless, task_options}, from, state) do
+    task =
+      task_options
+      |> Keyword.put(:type, "NoCaptchaTaskProxyless")
+      |> gen_task(ExAntiGate.Tasks.NoCaptchaTaskProxyless)
+
+    %{
+      task_uuid: task_uuid,
+      request: request
+    } = prepare_task_request(task_options, task, from)
+
+    Logger.debug "ExAntiGate: solve_text call, uuid: #{task_uuid}"
+
+    {:reply, task_uuid, Map.put(state, task_uuid, request)}
+  end
+
+  def handle_call({:no_captcha, task_options}, from, state) do
+    task =
+      task_options
+      |> Keyword.put(:type, "NoCaptchaTask")
+      |> gen_task(ExAntiGate.Tasks.NoCaptchaTask)
+
+    %{
+      task_uuid: task_uuid,
+      request: request
+    } = prepare_task_request(task_options, task, from)
+
+    Logger.debug "ExAntiGate: solve_text call, uuid: #{task_uuid}"
+
+    {:reply, task_uuid, Map.put(state, task_uuid, request)}
   end
 
   # generate task uuid, put image data into state, send request to antigate
   # and return task uuid
   @doc false
-  def handle_call({:solve_text, image, options}, from, state) do
-    task_uuid = UUID.uuid4()
-    options = merge_options(options)
-    timer = Process.send_after(self(), {:cancel_task_timeout, task_uuid}, options.max_timeout)
+  def handle_call({:solve_text, image, task_options}, from, state) do
 
-    task = Map.merge(options, %{from: from, image: image, type: "ImageToTextTask", timer: timer})
+    task =
+      task_options
+      |> Keyword.put(:body, image)
+      |> Keyword.put(:type, "ImageToTextTask")
+      |> gen_task(ExAntiGate.Tasks.ImageToTextTask)
 
-    Process.send(self(), {:api_create_task, task_uuid}, [])
+    %{
+      task_uuid: task_uuid,
+      request: request
+    } = prepare_task_request(task_options, task, from)
 
     Logger.debug "ExAntiGate: solve_text call, uuid: #{task_uuid}"
 
-    {:reply, task_uuid, Map.merge(state, %{task_uuid => task})}
+    {:reply, task_uuid, Map.put(state, task_uuid, request)}
   end
 
   @doc false
@@ -202,16 +300,21 @@ defmodule ExAntiGate do
     case Map.get(state, task_uuid) do
       nil -> false
 
-      task ->
-        unless Map.get(task, :fake), do:
-          spawn fn ->
-            task_request = Jason.encode!(gen_task_request(task))
+      request ->
+        spawn fn ->
+          task_request =
+            request
+            |> gen_task_request()
+            |> Jason.encode!()
 
-            Logger.debug "ExAntiGate: api_create_task call, sending request, uuid: #{task_uuid}, request: #{task_request}"
-            response = task.http_client.post("#{task.api_host}/createTask", task_request, [{"Content-Type", "application/json"}])
-            Logger.debug "ExAntiGate: api_create_task call, got response, uuid: #{task_uuid}, response: #{inspect response}"
-            ExAntiGate.proceed_result(response, task_uuid)
-          end
+          Logger.debug "ExAntiGate: api_create_task call, sending request, uuid: #{task_uuid}, request: #{task_request}"
+
+          response = request.http_client.post("#{request.api_host}/createTask", task_request, [{"Content-Type", "application/json"}])
+
+          Logger.debug "ExAntiGate: api_create_task call, got response, uuid: #{task_uuid}, response: #{inspect response}"
+
+          ExAntiGate.proceed_result(response, task_uuid)
+        end
     end
 
     {:noreply, state}
@@ -225,13 +328,15 @@ defmodule ExAntiGate do
       nil -> false
 
       task ->
-        unless Map.get(task, :fake), do:
-          spawn fn ->
-            Logger.debug "ExAntiGate: api_get_task_result call, sending request, uuid: #{task_uuid}"
-            response = task.http_client.post("#{task.api_host}/getTaskResult", Jason.encode!(%{clientKey: task.api_key, taskId: task.api_task_id}), [{"Content-Type", "application/json"}])
-            Logger.debug "ExAntiGate: api_get_task_result call, got response, uuid: #{task_uuid}, response: #{inspect response}"
-            ExAntiGate.proceed_result(response, task_uuid)
-          end
+        spawn fn ->
+          Logger.debug "ExAntiGate: api_get_task_result call, sending request, uuid: #{task_uuid}"
+
+          response = task.http_client.post("#{task.api_host}/getTaskResult", Jason.encode!(%{clientKey: task.api_key, taskId: task.api_task_id}), [{"Content-Type", "application/json"}], [timeout: Config.get(:max_timeout), recv_timeout: Config.get(:max_timeout)])
+
+          Logger.debug "ExAntiGate: api_get_task_result call, got response, uuid: #{task_uuid}, response: #{inspect response}"
+
+          ExAntiGate.proceed_result(response, task_uuid)
+        end
     end
 
     {:noreply, state}
@@ -292,14 +397,16 @@ defmodule ExAntiGate do
   # Deal with result if the task is done and task type is Image
   # in case of push: true
   defp proceed_response(
-          %{type: "ImageToTextTask"} = task, task_uuid,
-           {:ok, %{"errorId" => 0, "status" => "ready", "solution" => %{"text" => text}} = _json_body},
-           state) do
+            task,
+            task_uuid,
+            {:ok, %{"errorId" => 0, "status" => "ready"} = response},
+            state)
+  do
 
     state
-    |> put_in([task_uuid, :result], %{text: text})
+    |> put_in([task_uuid, :response], response)
     |> put_in([task_uuid, :status], :ready)
-    |> push_data(task, task_uuid, {:ready, task_uuid, %{text: text}})
+    |> push_data(task, task_uuid, {:ready, task_uuid, response})
   end
 
   # Any other - probably an error
@@ -350,7 +457,7 @@ defmodule ExAntiGate do
   # All other errors
   defp proceed_error(task, task_uuid, {error_id, error_code, error_descr}, state) do
     state
-    |> put_in([task_uuid, :result], {error_id, error_code, error_descr})
+    |> put_in([task_uuid, :response], {error_id, error_code, error_descr})
     |> put_in([task_uuid, :status], :error)
     |> push_data(task, task_uuid, {:error, task_uuid, error_id, error_code, error_descr})
   end
@@ -378,33 +485,45 @@ defmodule ExAntiGate do
         clientKey: full_task.api_key,
         softId: "829",
         languagePool: full_task.language_pool,
-        task: gen_task(full_task)
+        task: full_task.task |> Enum.into(%{})
     }
+  end
+
+  defp gen_request_options(task_options) do
+    Config.get_all_env()
+    |> Enum.map(fn {key, value} ->
+      {key, Keyword.get(task_options, key, value)}
+    end)
+    |> Enum.into(%{})
+    |> Map.merge(@task_defaults)
+  end
+
+  defp prepare_task_request(task_options, task, from) do
+    task_uuid = UUID.uuid4()
+
+    request_options = gen_request_options(task_options)
+    timer = Process.send_after(self(), {:cancel_task_timeout, task_uuid}, request_options.max_timeout)
+
+    request = %{request_options | from: from, task: task, timer: timer}
+
+    Process.send(self(), {:api_create_task, task_uuid}, [])
+
+    %{task_uuid: task_uuid, request: request}
   end
 
   # Generate task object
-  defp gen_task(%{type: "ImageToTextTask"} = full_task) do
-    %{
-       type: full_task.type,
-       body: full_task.image,
-       phrase: full_task.phrase,
-       case: full_task.case,
-       numeric: full_task.numeric,
-       math: full_task.math,
-       minLength: full_task.min_length,
-       maxLength: full_task.max_length,
-    }
-  end
-  defp gen_task(_full_task) do
-    %{}
-  end
+  def gen_task([_|_] = task_options, module) do
+    require Logger
 
-  defp merge_options(options) do
-    Config.get_all_env()
-    |> Enum.concat(options)
-    |> Enum.into(%{})
-    |> Map.delete(:included_applications)
-    |> Map.merge(@task_defaults)
+    module.defaults()
+    |> Enum.map(fn
+      {key, value} ->
+        default = Config.get_sub(module.config_key(), key, value)
+
+        {key, Keyword.get(task_options, key, default)}
+    end)
+    |> Enum.reject(&(&1 |> elem(1) |> is_nil()))
+
   end
 
 end

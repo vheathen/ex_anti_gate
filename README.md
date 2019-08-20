@@ -9,13 +9,23 @@ Unofficial [anti-captcha.com](http://anti-captcha.com)
 ([antigate.com](http://antigate.com)) API client for Elixir. The antigate service solves 
 captchas by human workers.
 
+Supports:
+- **ImageToTextTask** : solve usual image captcha
+- **NoCaptchaTask** : Google Recaptcha puzzle solving
+- **NoCaptchaTaskProxyless** : Google Recaptcha puzzle solving without proxies
+- **RecaptchaV3TaskProxyless** : Google Recaptcha v.3
+- **FunCaptchaTask** - rotating captcha funcaptcha.com
+- **FunCaptchaTaskProxyless** - funcaptcha without proxy
+- **SquareNetTextTask** : select objects on image with an overlay grid
+
+
 ## Installation
 Add it to your dependencies:
 
 ```elixir
 # mix.exs
 def deps do
-  [{:ex_anti_gate, "~> 0.3"}]
+  [{:ex_anti_gate, "~> 0.4"}]
 end
 ```
 
@@ -27,8 +37,10 @@ is shutting down with a notice. It's possible to set it in config file or via en
 `EX_ANTI_GATE_API_KEY`. Note: in case of both (system and config) options exist at the same time 
 the environment variable value will be used. 
 
-Default options look like this:
+Since 0.4 version now settings split into common and task specific parts.
 
+Default common options look like this:
+```elixir
     config :ex_anti_gate,
         autostart: true, # Start ExAntiGate process on application start
         http_client: HTTPoison, # http client - change for testing proposes only
@@ -46,27 +58,36 @@ Default options look like this:
                                          # 0 - until (max_timeout - result_request_inteval) milliseconds gone
         max_timeout: 120_000,            # captcha recognition maximum timeout;
                                          # the result value must be read during this period
-        phrase: false,                   # does captcha have one or more spaces
-        case: false,                     # captcha is case sensetive
-        numeric: 0,                      # 0 - any symbols
-                                         # 1 - captcha has digits only
-                                         # 2 - captcha has any symbols EXCEPT digits
-        math: false,                     # captcha is a math equation and it's necessary to solve it and enter result
-        min_length: 0,                   # 0 - has no limits
-                                         # > 0 - an integer sets minimum captcha length
-        max_length: 0, # 0 - has no limits
-                       # > 0 - an integer sets maximum captcha length
         push: false    # do not reply to the sender by default (wait for a result request)
+```
+
+Default tasks options exists for ImageToTextTask only but you can set any options you need the same way:
+```elixir
+    config :ex_anti_gate,
+        :image_to_text:
+          [
+            phrase: false,                   # does captcha have one or more spaces
+            case: false,                     # captcha is case sensetive
+            numeric: 0,                      # 0 - any symbols
+                                            # 1 - captcha has digits only
+                                            # 2 - captcha has any symbols EXCEPT digits
+            math: false,                     # captcha is a math equation and it's necessary to solve it and enter result
+            min_length: 0,                   # 0 - has no limits
+                                            # > 0 - an integer sets minimum captcha length
+            max_length: 0, # 0 - has no limits
+                          # > 0 - an integer sets maximum captcha length
+          ]
+```
 
 ## Using
 It is possible to use it in standard and push mode.
 
-In standard mode you send a task request with `ExAntiGate.solve_text_task/2` function and then can
+In standard mode you send a task request with `ExAntiGate.solve_captcha/2` function and then can
 request current result with `ExAntiGate.get_task_result/1` or a full task stack with `ExAntiGate.get_task/1`.
 `get_task_result/1` is preferable.
 
 In push mode you should wait for two kind of tuples:
-  * `{:ex_anti_gate_result, {:ready, task_uuid :: String.t(), result :: any}}` in case of successfull task or
+  * `{:ex_anti_gate_result, {:ready, task_uuid :: String.t(), response :: any}}` in case of successfull task or
   * `{:ex_anti_gate_result, {:error, task_uuid :: String.t(), error_id :: integer, error_code :: String.t(), error_description :: String.t()}}` - in
  case of any errors.
 
@@ -80,7 +101,7 @@ For example:
 
       # Server API
 
-      def handle_info({:ex_anti_gate_result, {:ready, task_uuid, %{text: text} = _result}}, state) do
+      def handle_info({:ex_anti_gate_result, {:ready, task_uuid, %{"solution" => %{"text" => text}} = _response}}, state) do
         # deal with captcha text
       end
 
@@ -92,6 +113,8 @@ For example:
 ```
 Please beware that in push mode task data disappear right after message is sent without any kind of delivery check and
 in standard mode task data disappear after `max_timeout` amount of time.
+
+Please check available task options in the [Antigate tasks documentation](https://anticaptcha.atlassian.net/wiki/spaces/API/pages/5079084/Captcha+Task+Types)
 
 ## Errors
 You can find most errors description in the [Antigate documentation](https://anticaptcha.atlassian.net/wiki/display/API/Errors).

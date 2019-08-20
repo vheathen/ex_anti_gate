@@ -9,7 +9,7 @@ defmodule ExAntiGateRealTest do
     Application.put_env(:ex_anti_gate, :language_pool, "rn")
     Application.put_env(:ex_anti_gate, :min_length, 5)
     Application.put_env(:ex_anti_gate, :max_length, 5)
-    Application.put_env(:ex_anti_gate, :max_timeout, 30_000)
+    Application.put_env(:ex_anti_gate, :max_timeout, 60_000)
 
     :ok
   end
@@ -21,7 +21,7 @@ defmodule ExAntiGateRealTest do
 
     task_uuid = ExAntiGate.solve_text_task(image, push: true)
 
-    assert_receive {:ex_anti_gate_result, {:ready, ^task_uuid, %{text: ^code}}},
+    assert_receive {:ex_anti_gate_result, {:ready, ^task_uuid, %{"solution" => %{"text" => ^code}}}},
                    Application.get_env(:ex_anti_gate, :max_timeout) + 100
   end
 
@@ -32,12 +32,12 @@ defmodule ExAntiGateRealTest do
 
     task_uuid = ExAntiGate.solve_text_task(image)
 
-    :timer.sleep 25_000
+    :timer.sleep 45_000
 
     {status, result} = ExAntiGate.get_task_result(task_uuid)
 
     assert status == :ready
-    assert result.text == code
+    assert get_in(result, ["solution", "text"]) == code
   end
 
   test "image 2 without push" do
@@ -47,12 +47,13 @@ defmodule ExAntiGateRealTest do
 
     task_uuid = ExAntiGate.solve_text_task(image)
 
-    :timer.sleep 25_000
+    :timer.sleep 45_000
 
     task = ExAntiGate.get_task(task_uuid)
 
     assert task.status == :ready
-    assert task.result.text == code
+    assert get_in(task, [:response, "solution", "text"]) == code
+
   end
 
 end

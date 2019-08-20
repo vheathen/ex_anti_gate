@@ -1,6 +1,12 @@
 defmodule ExAntiGate.Config do
   @moduledoc false
 
+  @tasks [
+    :image_to_text,
+  ]
+
+  @app_name :ex_anti_gate
+
   def get_defaults do
     %{
         autostart: true, # Start ExAntiGate process on application start
@@ -19,17 +25,7 @@ defmodule ExAntiGate.Config do
                                          # 0 - until (max_timeout - result_request_inteval) milliseconds gone
         max_timeout: 120_000,            # captcha recognition maximum timeout;
                                          # the result value must be read during this period
-        phrase: false,                   # does captcha have one or more spaces
-        case: false,                     # captcha is case sensetive
-        numeric: 0,                      # 0 - any symbols
-                                         # 1 - captcha has digits only
-                                         # 2 - captcha has any symbols EXCEPT digits
-        math: false,                     # captcha is a math equation and it's necessary to solve it and enter result
-        min_length: 0,                   # 0 - has no limits
-                                         # > 0 - an integer sets minimum captcha length
-        max_length: 0, # 0 - has no limits
-                       # > 0 - an integer sets maximum captcha length
-        push: false    # do not reply to the sender by default (wait for a result request)
+        push: false,    # do not reply to the sender by default (wait for a result request)
     }
   end
 
@@ -75,7 +71,7 @@ defmodule ExAntiGate.Config do
   end
 
   def get(key) when is_atom(key) do
-    get(:ex_anti_gate, key)
+    get(@app_name, key)
   end
 
   @doc """
@@ -97,6 +93,14 @@ defmodule ExAntiGate.Config do
   end
 
   def get_integer(key) do
-    get_integer(:ex_anti_gate, key)
+    get_integer(@app_name, key)
   end
+
+  def get_sub(key, subkey, default \\ nil) do
+    case get(key) do
+      nil -> nil
+      value -> Keyword.get(value, subkey, default)
+    end
+  end
+
 end

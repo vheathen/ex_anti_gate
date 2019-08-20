@@ -4,6 +4,7 @@ defmodule ExAntiGateTest.Config do
   def config_defaults do
     %{
         autostart: true, # Start ExAntiGate process on application start
+        http_client: HTTPoisonTest,
 #        http_client: HTTPoison, # http client - change for testing proposes only
 
         # ############################# task options #####################################
@@ -19,17 +20,7 @@ defmodule ExAntiGateTest.Config do
                                          # 0 - until (max_timeout - result_request_inteval) milliseconds gone
         max_timeout: 120_000,            # captcha recognition maximum timeout;
                                          # the result value must be read during this period
-        phrase: false,                   # does captcha have one or more spaces
-        case: false,                     # captcha is case sensetive
-        numeric: 0,                      # 0 - any symbols
-                                         # 1 - captcha has digits only
-                                         # 2 - captcha has any symbols EXCEPT digits
-        math: false,                     # captcha is a math equation and it's necessary to solve it and enter result
-        min_length: 0,                   # 0 - has no limits
-                                         # > 0 - an integer sets minimum captcha length
-        max_length: 0, # 0 - has no limits
-                       # > 0 - an integer sets maximum captcha length
-        push: false    # do not reply to the sender by default (wait for a result request)
+        push: false
     }
   end
 
@@ -39,11 +30,12 @@ defmodule ExAntiGateTest.Config do
       from: nil,
       timer: nil,
       type: nil,
-      image: nil,
+      task: nil,
       no_slot_attempts: 0,
       status: :waiting,
-      result: :none,
-      api_task_id: nil
+      response: :none,
+      api_task_id: nil,
+      push: false
     }
   end
 
