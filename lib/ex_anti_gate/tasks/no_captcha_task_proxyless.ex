@@ -9,7 +9,4 @@ defmodule ExAntiGate.Tasks.NoCaptchaTaskProxyless do
       websiteSToken: nil,
       isInvisible: nil
     ]
-
-  def config_key, do: :no_captcha_proxyless
-
 end

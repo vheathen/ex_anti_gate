@@ -3,7 +3,7 @@ defmodule ExAntiGate.Mixfile do
 
   def project do
     [app: :ex_anti_gate,
-     version: "0.4.0",
+     version: "0.4.1",
      elixir: "~> 1.7",
      elixirc_paths: elixirc_paths(Mix.env),
      build_embedded: Mix.env == :prod,

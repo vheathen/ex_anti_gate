@@ -15,7 +15,4 @@ defmodule ExAntiGate.Tasks.FunCaptchaTask do
       userAgent: nil,
       cookies: nil
     ]
-
-  def config_key, do: :fun_captcha
-
 end

@@ -9,7 +9,4 @@ defmodule ExAntiGate.Tasks.SquareNetTextTask do
       rowsCount: nil,
       columnsCount: nil
     ]
-
-  def config_key, do: :square_net_text
-
 end

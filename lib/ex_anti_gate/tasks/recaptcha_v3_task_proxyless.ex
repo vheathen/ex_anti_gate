@@ -9,7 +9,4 @@ defmodule ExAntiGate.Tasks.RecaptchaV3TaskProxyless do
       minScore: nil,
       pageAction: nil
     ]
-
-  def config_key, do: :no_captcha
-
 end

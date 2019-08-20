@@ -8,7 +8,4 @@ defmodule ExAntiGate.Tasks.FunCaptchaTaskProxyless do
       funcaptchaApiJSSubdomain: nil,
       websitePublicKey: nil
     ]
-
-  def config_key, do: :fun_captcha_proxyless
-
 end

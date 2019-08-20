@@ -16,7 +16,4 @@ defmodule ExAntiGate.Tasks.NoCaptchaTask do
       cookies: nil,
       isInvisible: nil
     ]
-
-  def config_key, do: :no_captcha
-
 end

@@ -16,7 +16,4 @@ defmodule ExAntiGate.Tasks.ImageToTextTask do
       max_length: 0, # 0 - has no limits
                     # > 0 - an integer sets maximum captcha length
     ]
-
-  def config_key, do: :image_to_text
-
 end

@@ -63,20 +63,17 @@ Default common options look like this:
 
 Default tasks options exists for ImageToTextTask only but you can set any options you need the same way:
 ```elixir
-    config :ex_anti_gate,
-        :image_to_text:
-          [
-            phrase: false,                   # does captcha have one or more spaces
-            case: false,                     # captcha is case sensetive
-            numeric: 0,                      # 0 - any symbols
-                                            # 1 - captcha has digits only
-                                            # 2 - captcha has any symbols EXCEPT digits
-            math: false,                     # captcha is a math equation and it's necessary to solve it and enter result
-            min_length: 0,                   # 0 - has no limits
-                                            # > 0 - an integer sets minimum captcha length
-            max_length: 0, # 0 - has no limits
-                          # > 0 - an integer sets maximum captcha length
-          ]
+    config :ex_anti_gate, ExAntiGate.Tasks.ImageToTextTask,
+          phrase: false,                   # does captcha have one or more spaces
+          case: false,                     # captcha is case sensetive
+          numeric: 0,                      # 0 - any symbols
+                                          # 1 - captcha has digits only
+                                          # 2 - captcha has any symbols EXCEPT digits
+          math: false,                     # captcha is a math equation and it's necessary to solve it and enter result
+          min_length: 0,                   # 0 - has no limits
+                                          # > 0 - an integer sets minimum captcha length
+          max_length: 0, # 0 - has no limits
+                        # > 0 - an integer sets maximum captcha length
 ```
 
 ## Using
