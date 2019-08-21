@@ -199,6 +199,7 @@ defmodule ExAntiGate do
   # Server API
   # #########################################################
 
+  @doc false
   def init(args) do
     {:ok, args}
   end
@@ -209,7 +210,6 @@ defmodule ExAntiGate do
     {:reply, Map.get(state, task_uuid), state}
   end
 
-  @doc false
   def handle_call({:get_task_result, task_uuid}, _from, state) do
     Logger.debug "ExAntiGate: get_task_result call, uuid: #{task_uuid}"
     {:reply, {get_in(state, [task_uuid, :status]), get_in(state, [task_uuid, :response])}, state}
@@ -454,7 +454,7 @@ defmodule ExAntiGate do
     %{task_uuid: task_uuid, request: request}
   end
 
-  # Generate task object
+  @doc false
   defp gen_task([_|_] = task_options, module) do
     require Logger
 

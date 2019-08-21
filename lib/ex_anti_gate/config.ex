@@ -1,10 +1,6 @@
 defmodule ExAntiGate.Config do
   @moduledoc false
 
-  @tasks [
-    :image_to_text,
-  ]
-
   @app_name :ex_anti_gate
 
   def get_defaults do
